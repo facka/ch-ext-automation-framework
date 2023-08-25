@@ -1,24 +1,63 @@
-import './style.css'
-import typescriptLogo from './typescript.svg'
-import viteLogo from '/vite.svg'
-import { setupCounter } from './counter.ts'
+import {
+  SelectorBuilder,
+  is,
+  classIs,
+  innerTextIs,
+  innerTextContains,
+  titleIs,
+  placeholderIs,
+  isFirstElement,
+  elementIndexIs,
+  firstChildTextIs
+} from './ui-element-builder';
 
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <div>
-    <a href="https://vitejs.dev" target="_blank">
-      <img src="${viteLogo}" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://www.typescriptlang.org/" target="_blank">
-      <img src="${typescriptLogo}" class="logo vanilla" alt="TypeScript logo" />
-    </a>
-    <h1>Vite + TypeScript</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite and TypeScript logos to learn more
-    </p>
-  </div>
-`
+import {
+  Task,
+  Click,
+  Assert,
+  Select,
+  Type,
+  TypePassword,
+  ClearValue,
+  SaveValue,
+  DateUtils,
+  AutomationEvents,
+  EVENT_NAMES
+} from './automation';
 
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
+import {
+ waitForElement,
+ wait,
+ waitForElements,
+ logAction,
+ displayContext
+} from './ui-utils';
+
+export {
+  SelectorBuilder,
+  is,
+  classIs,
+  innerTextIs,
+  innerTextContains,
+  titleIs,
+  placeholderIs,
+  isFirstElement,
+  elementIndexIs,
+  firstChildTextIs,
+  Task,
+  Click,
+  Assert,
+  Select,
+  Type,
+  TypePassword,
+  ClearValue,
+  SaveValue,
+  DateUtils,
+  AutomationEvents,
+  EVENT_NAMES,
+  waitForElement,
+  wait,
+  waitForElements,
+  logAction,
+  displayContext
+};
