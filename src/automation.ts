@@ -10,6 +10,7 @@ import {
   SelectAction,
   TypeAction,
   TypePasswordAction,
+  PressEscKeyAction,
   SaveValueAction,
 } from './actions'
 import { UIElement, hideCheckElementContainer } from "./ui-utils"
@@ -181,6 +182,14 @@ const ClearValue = () => {
   }
 }
 
+const PressEscKey = () => {
+  return {
+    in: (uiElement: UIElement) => {
+      AutomationCompiler.addAction(new PressEscKeyAction(uiElement))
+    }
+  }
+}
+
 const TypePassword = (value: string) => {
   return {
     in: (uiElement: UIElement) => {
@@ -210,6 +219,7 @@ export {
   Type,
   TypePassword,
   ClearValue,
+  PressEscKey,
   SaveValue,
   DateUtils,
   AutomationEvents,

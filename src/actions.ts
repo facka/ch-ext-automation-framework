@@ -468,6 +468,47 @@ class TypePasswordAction extends ActionOnElement {
   }
 }
 
+class PressEscKeyAction extends ActionOnElement {
+  constructor (uiElement: UIElement) {
+    super(uiElement)
+  }
+
+  protected executeActionOnElement () {
+    this.element?.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        altKey: false,
+        code: "Escape",
+        ctrlKey: false,
+        isComposing: false,
+        key: "Escape",
+        location: 0,
+        metaKey: false,
+        repeat: false,
+        shiftKey: false,
+        which: 27,
+        charCode: 0,
+        keyCode: 27,
+      })
+    )
+  }
+
+  getDescription () {
+    return `Press Esc key in ${this.getElementName()}`
+  }
+
+  getJSON () {
+    return {
+      id: this.id,
+      element: this.getElementName(),
+      type: 'PressEscKey',
+      description: this.getDescription(),
+      status: this.status,
+      error: this.error,
+      context: this.context,
+    }
+  }
+}
+
 class SaveValueAction extends ActionOnElement {
   memorySlotName: string
 
@@ -516,6 +557,7 @@ export {
   SelectAction,
   TypeAction,
   TypePasswordAction,
+  PressEscKeyAction,
   AssertTextIsAction,
   AssertContainsTextAction,
   AssertValueIsAction,
