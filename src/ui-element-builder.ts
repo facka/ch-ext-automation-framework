@@ -83,6 +83,10 @@ const classIs = (className: string) => {
   return (elem: HTMLElement) => elem.className == className
 }
 
+const classIncludes = (className: string) => {
+  return (elem: HTMLElement) => elem.className.split(' ').includes(className)
+}
+
 const innerTextIs = (text: string) => {
   return (elem: HTMLElement) => elem.innerText.trim() == text
 }
@@ -123,6 +127,7 @@ export {
   SelectorBuilder,
   is,
   classIs,
+  classIncludes,
   innerTextIs,
   innerTextContains,
   titleIs,
