@@ -13,6 +13,8 @@ import {
 } from './ui-element-builder';
 
 import {
+  Test,
+  RunTest,
   Task,
   Click,
   Assert,
@@ -47,6 +49,8 @@ export {
   isFirstElement,
   elementIndexIs,
   firstChildTextIs,
+  Test,
+  RunTest,
   Task,
   Click,
   Assert,

@@ -58,7 +58,10 @@ enum EVENT_NAMES {
   START = 'start',
   END = 'end',
   ACTION_UPDATE = 'action-update',
-  SAVE_VALUE = 'save-value'
+  SAVE_VALUE = 'save-value',
+  REGISTER_TEST = 'register-test',
+  TEST_PASSED = 'test-passed',
+  TEST_FAILED = 'test-failed',
 }
 
 type AutomationEventHandlerType = ((action?: any) => void)
@@ -83,7 +86,7 @@ class EventDispatcher {
     }
   }
 
-  dispatch(eventName: EVENT_NAMES, data: any) {
+  dispatch(eventName: EVENT_NAMES, data?: any) {
     if (this.events.has(eventName) ) {
       this.events.get(eventName)?.forEach((callback: AutomationEventHandlerType) => {
         callback(data)
@@ -110,10 +113,40 @@ class AutomationRunner {
     } catch (e: any) {
       await hideCheckElementContainer()
       console.error(`🤖 Error running task ${startAction.getDescription()}. Reason: ${e.message}`)
+      throw e
+    } finally {
+      AutomationRunner.running = false
+      AutomationEvents.dispatch(EVENT_NAMES.END, {})
     }
-    AutomationRunner.running = false
-    AutomationEvents.dispatch(EVENT_NAMES.END, {})
   }  
+}
+
+const TestsMap: any = {}
+
+const Test = (id: string, steps: () => void) => {
+  const testCode = () => {
+    const action = new Action(id, steps)
+    if (!AutomationRunner.running) {
+      try {
+        AutomationRunner.start(action)
+        AutomationEvents.dispatch(EVENT_NAMES.TEST_PASSED, { id })
+      } catch (e) {
+        AutomationEvents.dispatch(EVENT_NAMES.TEST_FAILED, { id })
+      }
+    } else {
+      throw new Error('Not able to run test while other test is running.')
+    }
+  }
+  AutomationEvents.dispatch(EVENT_NAMES.REGISTER_TEST, { id }) // TODO send action json
+  TestsMap[id] = testCode
+}
+
+const RunTest = (id: string) => {
+  if (!TestsMap[id]) {
+    throw new Error(`Test with id ${id} not found.`)
+  } else {
+    TestsMap[id]()
+  }
 }
 
 const Task = (id: string, steps: (params?: any) => void) => {
@@ -121,7 +154,11 @@ const Task = (id: string, steps: (params?: any) => void) => {
     const action = new Action(id, steps)
     action.setParams(params)
     if (!AutomationRunner.running) {
-      AutomationRunner.start(action)
+      try {
+        AutomationRunner.start(action)
+      } catch (e) {
+        console.log('Error running task ' + id)
+      }
     } else {
       AutomationCompiler.addAction(action)
       AutomationCompiler.compileAction(action)
@@ -212,6 +249,8 @@ const SaveValue = (uiElement: UIElement) => {
 // TODO add wait action     
 
 export {
+  Test,
+  RunTest,
   Task,
   Click,
   Assert,
