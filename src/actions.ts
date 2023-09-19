@@ -1,5 +1,5 @@
 import { AutomationEvents, EVENT_NAMES } from "./automation";
-import { UIElement, waitForElement, checkElement, hideCheckElementContainer, wait } from "./ui-utils"
+import { UIElement, checkElement, hideCheckElementContainer, wait } from "./ui-utils"
 import {v4 as uuidv4} from 'uuid';
 
 
@@ -63,7 +63,8 @@ abstract class AbstractAction {
       this.status = 'running'
       this.context.beforeInputValues = this.getInputValuesFromPage()
       this.context.beforeHTML = document.body.innerHTML
-      await this.notifyActionUpdated()
+      await AbstractAction.notifyActionUpdated(this)
+      console.log('Action: ', this.getDescription())
       await this.executeAction()
       this.status = 'success'
       this.error = ''
@@ -74,13 +75,13 @@ abstract class AbstractAction {
     } finally {
       this.context.afterInputValues = this.getInputValuesFromPage()
       this.context.afterHTML = document.body.innerHTML
-      await this.notifyActionUpdated()
+      await AbstractAction.notifyActionUpdated(this)
     }
   }
 
-  async notifyActionUpdated () {
+  static async notifyActionUpdated (action: AbstractAction) {
     AutomationEvents.dispatch(EVENT_NAMES.ACTION_UPDATE, {
-      action: this.getJSON(),
+      action: action.getJSON(),
     })
   }
 }
@@ -101,7 +102,7 @@ class Action extends AbstractAction {
   }
 
   getDescription () {
-    return this.name
+    return this.name 
   }
 
   compileSteps () {
@@ -138,7 +139,7 @@ class Action extends AbstractAction {
     if (this.index < this.steps.length) {
       const action = this.steps[this.index]
       try {
-        await wait(1000)
+        await wait(200)
         await action.execute()
         this.index++
       } catch (e) {
@@ -166,22 +167,91 @@ class Action extends AbstractAction {
 abstract class ActionOnElement extends AbstractAction {
   uiElement: UIElement
   element: HTMLElement | null
+  tries: number
 
   constructor (uiElement: UIElement) {
     super()
     this.uiElement = uiElement
     this.element = null
+    this.tries = 0
   }
 
   getElementName () {
     return this.uiElement.getElementName()
   }
 
+  updateTries (tries: number) {
+    this.tries = tries
+  }
+
+  getJSON () {
+    return {
+      id: this.id,
+      element: this.getElementName(),
+      description: this.getDescription(),
+      status: this.status,
+      error: this.error,
+      context: this.context,
+      tries: this.tries
+    }
+  }
+
   protected abstract executeActionOnElement() : void
+
+  /**
+   * 
+   * @param uiElement
+   * @param delay of each try. Defaults to 1 second
+   */
+  static waitForElement (currentAction: ActionOnElement, uiElement: UIElement, delay: number = 1000, maxTries = 10): Promise<HTMLElement> {
+    const elementName = uiElement.getElementName()
+    return new Promise(async (resolve, reject) => {
+      
+      // retry function 
+      const retry = async (parentElement: HTMLElement | null, delay = 1000, index = 0) => {
+        console.groupCollapsed(`tries ${index}/${maxTries}`)
+        currentAction.updateTries(index)
+        await AbstractAction.notifyActionUpdated(currentAction)
+        if (index === maxTries) {
+          console.groupEnd()
+          reject(new Error(`UI Element ${elementName || 'UNKNNOWN'} not found after 10 tries`))
+        } else {
+          const elem = uiElement.selector(parentElement, uiElement.postProcess)
+          if (elem) {
+            console.groupEnd()
+            console.log('Element found = ', elem)
+            resolve(elem)
+          } else {
+            console.groupEnd()
+            await wait(delay)
+            await retry(parentElement, delay, ++index)
+          }
+        }
+      }
+
+      console.group('Looking for Element: ' + elementName);
+
+      let parentElement: HTMLElement | null = null
+      if (uiElement.parent) {
+        console.groupCollapsed('Look for Parent ', uiElement.parent.getElementName())
+        try {
+          parentElement = await ActionOnElement.waitForElement(currentAction, uiElement.parent)
+          console.groupEnd()
+          console.log('using parent element: ', parentElement)
+        } catch (e) {
+          console.groupEnd()
+          reject(new Error(`Parent ${uiElement.parent.getElementName()} of UI Element ${uiElement.name || 'UNKNNOWN'} not found`))
+        }
+      }
+
+      await retry(parentElement, delay)
+      console.groupEnd()
+    })
+  }
 
   async executeAction () {
     try {
-      this.element = await waitForElement(this.uiElement) as HTMLElement
+      this.element = await ActionOnElement.waitForElement(this, this.uiElement) as HTMLElement
       this.element?.setAttribute("test-id", this.getElementName());
       await checkElement(this.element, this.getElementName())
       this.executeActionOnElement()
@@ -213,13 +283,8 @@ class ClickAction extends ActionOnElement {
 
   getJSON () {
     return {
-      id: this.id,
-      element: this.getElementName(),
+      ...super.getJSON(),
       type: 'Click',
-      description: this.getDescription(),
-      status: this.status,
-      error: this.error,
-      context: this.context,
     }
   }
 }
@@ -245,14 +310,9 @@ class AssertTextIsAction extends ActionOnElement {
 
   getJSON () {
     return {
-      id: this.id,
-      element: this.getElementName(),
+      ...super.getJSON(),
       type: 'AssertTextIsAction',
       value: this.text,
-      description: this.getDescription(),
-      status: this.status,
-      error: this.error,
-      context: this.context,
     }
   }
 }
@@ -278,14 +338,9 @@ class AssertContainsTextAction extends ActionOnElement {
 
   getJSON () {
     return {
-      id: this.id,
-      element: this.getElementName(),
+      ...super.getJSON(),
       type: 'AssertContainsText',
       value: this.text,
-      description: this.getDescription(),
-      status: this.status,
-      error: this.error,
-      context: this.context,
     }
   }
 }
@@ -311,14 +366,9 @@ class AssertValueIsAction extends ActionOnElement {
 
   getJSON () {
     return {
-      id: this.id,
-      element: this.getElementName(),
+      ...super.getJSON(),
       type: 'AssertValueIsAction',
       value: this.value,
-      description: this.getDescription(),
-      status: this.status,
-      error: this.error,
-      context: this.context,
     }
   }
 }
@@ -342,13 +392,8 @@ class AssertExistsAction extends ActionOnElement {
 
   getJSON () {
     return {
-      id: this.id,
-      element: this.getElementName(),
+      ...super.getJSON(),
       type: 'AssertExistsAction',
-      description: this.getDescription(),
-      status: this.status,
-      error: this.error,
-      context: this.context,
     }
   }
 }
@@ -379,14 +424,9 @@ class SelectAction extends ActionOnElement {
 
   getJSON () {
     return {
-      id: this.id,
-      element: this.getElementName(),
+      ...super.getJSON(),
       type: 'Select',
       value: this.value,
-      description: this.getDescription(),
-      status: this.status,
-      error: this.error,
-      context: this.context,
     }
   }
 }
@@ -418,14 +458,9 @@ class TypeAction extends ActionOnElement {
 
   getJSON () {
     return {
-      id: this.id,
-      element: this.getElementName(),
+      ...super.getJSON(),
       type: 'Type',
       value: this.value,
-      description: this.getDescription(),
-      status: this.status,
-      error: this.error,
-      context: this.context,
     }
   }
 }
@@ -456,14 +491,9 @@ class TypePasswordAction extends ActionOnElement {
 
   getJSON () {
     return {
-      id: this.id,
-      element: this.getElementName(),
+      ...super.getJSON(),
       type: 'TypePassword',
       value: this.value,
-      description: this.getDescription(),
-      status: this.status,
-      error: this.error,
-      context: this.context,
     }
   }
 }
@@ -498,13 +528,80 @@ class PressEscKeyAction extends ActionOnElement {
 
   getJSON () {
     return {
-      id: this.id,
-      element: this.getElementName(),
+      ...super.getJSON(),
       type: 'PressEscKey',
-      description: this.getDescription(),
-      status: this.status,
-      error: this.error,
-      context: this.context,
+    }
+  }
+}
+
+class PressDownKeyAction extends ActionOnElement {
+  constructor (uiElement: UIElement) {
+    super(uiElement)
+  }
+
+  protected executeActionOnElement () {
+    this.element?.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        altKey: false,
+        code: "Down",
+        ctrlKey: false,
+        isComposing: false,
+        key: "Down",
+        location: 0,
+        metaKey: false,
+        repeat: false,
+        shiftKey: false,
+        which: 40,
+        charCode: 0,
+        keyCode: 40,
+      })
+    )
+  }
+
+  getDescription () {
+    return `Press Down key in ${this.getElementName()}`
+  }
+
+  getJSON () {
+    return {
+      ...super.getJSON(),
+      type: 'PressDownKey',
+    }
+  }
+}
+
+class PressTabKeyAction extends ActionOnElement {
+  constructor (uiElement: UIElement) {
+    super(uiElement)
+  }
+
+  protected executeActionOnElement () {
+    this.element?.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        altKey: false,
+        code: "Tab",
+        ctrlKey: false,
+        isComposing: false,
+        key: "Tab",
+        location: 0,
+        metaKey: false,
+        repeat: false,
+        shiftKey: false,
+        which: 9,
+        charCode: 0,
+        keyCode: 9,
+      })
+    )
+  }
+
+  getDescription () {
+    return `Press Tab key in ${this.getElementName()}`
+  }
+
+  getJSON () {
+    return {
+      ...super.getJSON(),
+      type: 'PressTabKey',
     }
   }
 }
@@ -537,14 +634,9 @@ class SaveValueAction extends ActionOnElement {
 
   getJSON () {
     return {
-      id: this.id,
-      element: this.getElementName(),
+      ...super.getJSON(),
       type: 'SaveValue',
       memorySlotName: this.memorySlotName,
-      description: this.getDescription(),
-      status: this.status,
-      error: this.error,
-      context: this.context,
     }
   }
 }
@@ -558,6 +650,8 @@ export {
   TypeAction,
   TypePasswordAction,
   PressEscKeyAction,
+  PressDownKeyAction,
+  PressTabKeyAction,
   AssertTextIsAction,
   AssertContainsTextAction,
   AssertValueIsAction,

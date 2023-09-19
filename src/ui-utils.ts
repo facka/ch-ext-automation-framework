@@ -18,180 +18,6 @@ class UIElement {
     }
     return `${this.name}${parent}`
   }
-
-  /**
-   * @deprecated
-   */
-  async click (): Promise<HTMLElement> {
-    const elem = await waitForElement(this) as HTMLElement
-    await checkElement(elem, this.name)
-    elem.click()
-    await logAction(`🤖 Clicked in ${this.getElementName()}`)
-    return elem
-  }
-
-  /**
-   * @deprecated
-   */
-  async type (value: string): Promise<HTMLElement> {
-    const elem = await waitForElement(this) as HTMLInputElement
-    let inputElem = elem
-    if (elem.tagName !== 'INPUT' && elem.tagName !== 'SELECT' && elem.tagName !== 'TEXTAREA') {
-      inputElem = elem.querySelectorAll('input')[0]
-      if (!inputElem) {
-        throw new Error('Input element not found. Not able to type value in element ' + this.name)
-      }
-    } // allows to type in wrapper elements which contain input elem
-    inputElem.value = value
-    var event = new Event('change');
-    inputElem.dispatchEvent(event);
-    await checkElement(elem, this.name)
-    await logAction(`🤖 Typed '${value}' in ${this.name}`)
-    return elem
-  }
-
-  /**
-   * @deprecated
-   */
-  async typePassword (value: string): Promise<HTMLElement> {
-    const elem = await waitForElement(this) as HTMLInputElement
-    elem.value = value
-    await checkElement(elem, this.name)
-    await logAction(`🤖 Typed a password in ${this.getElementName()}`)
-    return elem
-  }
-
-  /**
-   * @deprecated
-   */
-  async assert (conditionFn: (elem: HTMLElement) => boolean): Promise<HTMLElement> {
-    const foundElem = await waitForElement(this, 2000)
-    if (!conditionFn(foundElem)) {
-      throw new Error('No element found with the filter condition defined')
-    } else {
-      await checkElement(foundElem, this.name)
-      return foundElem
-    }
-  }
-
-  /**
-   * @deprecated
-   */
-  async assertTextIs (text: string): Promise<HTMLElement> {
-    const foundElem = await waitForElement(this, 2000)
-    if (foundElem.innerText !== text) {
-      throw new Error(`No element found with text ${text}`)
-    } else {
-      await checkElement(foundElem, this.name)
-      return foundElem
-    }
-  }
-
-  /**
-   * @deprecated
-   */
-  async assertContainsText (text: string): Promise<HTMLElement> {
-    const foundElem = await waitForElement(this, 2000)
-    if (!foundElem.innerText.includes(text)) {
-      throw new Error(`No element found that contains text ${text}`)
-    } else {
-      await checkElement(foundElem, this.name)
-      return foundElem
-    }
-  }
-
-  /**
-   * @deprecated
-   */
-  async assertValueIs (value: string | boolean | number | Date ): Promise<HTMLElement> {
-    const foundElem = await waitForElement(this, 2000)
-    if ((foundElem as HTMLInputElement).value === value) {
-      await checkElement(foundElem, this.name)
-      return foundElem  
-    } else {
-      throw new Error(`No element found with value ${value}`)
-    }
-  }
-  
-}
-
-class UIElementList {
-  name: string
-  selector: () => NodeListOf<Element>
-
-  constructor (name: string, selector: () => NodeListOf<Element>) {
-    this.name = name
-    this.selector = selector
-  }
-}
-
-function isFunction (functionToCheck: any) {
-  return functionToCheck && {}.toString.call(functionToCheck) === '[object Function]'
-}
-
-/**
- * 
- * @param uiElement
- * @param timeout defaults to 5 seconds 
- */
-const waitForElement = (uiElement: UIElement, timeout: number = 5000): Promise<HTMLElement> => {
-  let timeoutId: NodeJS.Timeout, retryId: NodeJS.Timeout
-  const elementName = uiElement.name
-  return new Promise(async (resolve, reject) => {
-    const retry = async (delay = 500) => {
-      let parentElement: HTMLElement | null = null
-      if (uiElement.parent) {
-        try {
-          parentElement = await waitForElement(uiElement.parent)
-        } catch (e) {
-          reject(new Error(`Parent ${uiElement.parent.getElementName()} of UI Element ${elementName || 'UNKNNOWN'} not found`))
-        }
-      }
-      return setTimeout(async () => {
-        const elem = uiElement.selector(parentElement, uiElement.postProcess)
-        if (elem) {
-          clearTimeout(timeoutId)
-          clearTimeout(retryId)
-          resolve(elem)
-        } else {
-          retryId = await retry()
-        }
-      }, delay)
-    }
-
-    retryId = await retry(0)
-
-    timeoutId = setTimeout(() => {
-      reject(new Error(`UI Element ${elementName || 'UNKNNOWN'} not found`))
-      clearTimeout(retryId)
-    }, timeout)
-  })
-}
-
-const waitForElements = (uiElement: UIElementList,  timeout: number = 5000): Promise<NodeListOf<Element>> => {
-  let timeoutId: NodeJS.Timeout, retryId: NodeJS.Timeout
-  const elementName = uiElement.name
-  return new Promise((resolve, reject) => {
-    const retry = (delay = 500) => {
-      return setTimeout(() => {
-        const elems = uiElement.selector()
-        if (elems.length) {
-          clearTimeout(timeoutId)
-          clearTimeout(retryId)
-          resolve(elems)
-        } else {
-          retryId = retry()
-        }
-      }, delay)
-    }
-
-    retryId = retry(0)
-
-    timeoutId = setTimeout(() => {
-      reject(new Error(`UI Elements ${elementName || 'UNKNNOWN'} not found`))
-      clearTimeout(retryId)
-    }, timeout)
-  })
 }
 
 const wait = (timeout = 2000) => {
@@ -199,6 +25,17 @@ const wait = (timeout = 2000) => {
     setTimeout(() => {
       resolve(null)
     }, timeout)
+  })
+}
+
+const updateStyle = (elem: HTMLElement, props: any) => {
+  const propsList = Object.entries(props).map(([key, value]) => ({
+    key,
+    value
+  }))
+  propsList.forEach((styleItem: any) => {
+    const {key, value} = styleItem
+    elem.style[key] = value
   })
 }
 
@@ -312,17 +149,6 @@ const hideCheckElementContainer = async () => {
   devToolsCheckElementContainer.style.display = 'none'
 }
 
-const updateStyle = (elem: HTMLElement, props: any) => {
-  const propsList = Object.entries(props).map(([key, value]) => ({
-    key,
-    value
-  }))
-  propsList.forEach((styleItem: any) => {
-    const {key, value} = styleItem
-    elem.style[key] = value
-  })
-}
-
 const contextViewerContainer = document.createElement('DIV')
 contextViewerContainer.id = 'context-viewer-container'
 updateStyle(contextViewerContainer, {
@@ -379,12 +205,9 @@ const displayContext = (context: any) => {
 }
 
 export {
-  waitForElement,
-  waitForElements,
   wait,
   logAction,
   UIElement,
-  UIElementList,
   checkElement,
   hideCheckElementContainer,
   displayContext,

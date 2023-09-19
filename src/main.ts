@@ -23,6 +23,8 @@ import {
   TypePassword,
   ClearValue,
   PressEscKey,
+  PressDownKey,
+  PressTabKey,
   SaveValue,
   DateUtils,
   AutomationEvents,
@@ -30,9 +32,7 @@ import {
 } from './automation';
 
 import {
- waitForElement,
  wait,
- waitForElements,
  logAction,
  displayContext
 } from './ui-utils';
@@ -59,13 +59,13 @@ export {
   TypePassword,
   ClearValue,
   PressEscKey,
+  PressDownKey,
+  PressTabKey,
   SaveValue,
   DateUtils,
   AutomationEvents,
   EVENT_NAMES,
-  waitForElement,
   wait,
-  waitForElements,
   logAction,
   displayContext
 };

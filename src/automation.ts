@@ -11,6 +11,8 @@ import {
   TypeAction,
   TypePasswordAction,
   PressEscKeyAction,
+  PressDownKeyAction,
+  PressTabKeyAction,
   SaveValueAction,
 } from './actions'
 import { UIElement, hideCheckElementContainer } from "./ui-utils"
@@ -19,19 +21,31 @@ const formatDate = (date: Date) => {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
-const today = new Date()
-const today1 = new Date()
-const today2 = new Date()
-const today3 = new Date()
-const tomorrow = formatDate(new Date(today1.setDate(today1.getDate() + 1)))
-const nextWeek = formatDate(new Date(today2.setDate(today2.getDate() + 7)))
-const nextMonth = formatDate(new Date(today3.setMonth(today3.getMonth() + 1)))
+const setDateFromToday = (numberOfDays: number) => {
+  const date = new Date()
+  return formatDate(new Date(date.setDate(date.getDate() + numberOfDays)))
+}
+
+const setMonthFromToday = (numberOfMonths: number) => {
+  const date = new Date()
+  return formatDate(new Date(date.setMonth(date.getMonth() + numberOfMonths)))
+}
+
+const tomorrow = setDateFromToday(1)
+const yesterday = setDateFromToday(-1)
+const nextWeek = setDateFromToday(7)
+const lastWeek = setDateFromToday(-7)
+const nextMonth = setMonthFromToday(1)
+const lastMonth = setMonthFromToday(-1)
 
 const DateUtils = {
-  today: formatDate(today),
+  today: formatDate(new Date()),
   tomorrow,
   nextWeek,
   nextMonth,
+  yesterday,
+  lastWeek,
+  lastMonth
 }
 
 class AutomationCompiler {
@@ -227,6 +241,22 @@ const PressEscKey = () => {
   }
 }
 
+const PressDownKey = () => {
+  return {
+    in: (uiElement: UIElement) => {
+      AutomationCompiler.addAction(new PressDownKeyAction(uiElement))
+    }
+  }
+}
+
+const PressTabKey = () => {
+  return {
+    in: (uiElement: UIElement) => {
+      AutomationCompiler.addAction(new PressTabKeyAction(uiElement))
+    }
+  }
+}
+
 const TypePassword = (value: string) => {
   return {
     in: (uiElement: UIElement) => {
@@ -259,6 +289,8 @@ export {
   TypePassword,
   ClearValue,
   PressEscKey,
+  PressDownKey,
+  PressTabKey,
   SaveValue,
   DateUtils,
   AutomationEvents,

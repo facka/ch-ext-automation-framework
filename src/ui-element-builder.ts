@@ -3,19 +3,26 @@ import { UIElement } from './ui-utils'
 const SelectorBuilder = (query: string, filterFn?: (value: HTMLElement, index: number, array: readonly HTMLElement[]) => Boolean) => {
   const selector = (root = document, postProcess?: (elem: HTMLElement) => HTMLElement) => {
     root = root || document
+    console.log('Searching elem from Root = ', root)
     const elementsFound: HTMLElement[] = []
-    root.querySelectorAll(query).forEach((e: Element) => {
-      elementsFound.push(e as HTMLElement)
+    root.querySelectorAll<HTMLElement>(query).forEach((e: HTMLElement) => {
+      if (e.style.display !== 'none' ) {
+        elementsFound.push(e)
+      }
     })
     let elemFound
     if (filterFn) {
+      console.log('Applying filter ', filterFn)
+      console.log('  -- to ' + elementsFound.length + 'elements')
       elemFound = elementsFound.filter(filterFn)[0]
     } else {
       elemFound = elementsFound[0]
     }
     if (postProcess) {
+      console.log('Apply post process to = ', elemFound)
       elemFound = postProcess(elemFound)
     }
+    console.log('Return elem = ', elemFound)
     return elemFound
   }
   return selector
@@ -33,14 +40,14 @@ const selectorIdentifier = (selector: any, parent: UIElement | null, postProcess
 })
 
 const postProcessResponse = (selector: any, parent: UIElement | null) => ({
-  ...selectorIdentifier(selector, null),
+  ...selectorIdentifier(selector, parent),
   /**
    * Tansform the UI element that will be returned
    * @param postProcessFn 
    * @returns 
    */
   postProcess: (postProcessFn: (elem: HTMLElement) => (HTMLElement | null)) => ({
-    ...selectorIdentifier(selector, null, postProcessFn)
+    ...selectorIdentifier(selector, parent, postProcessFn)
   })
 })
 
