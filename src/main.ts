@@ -26,6 +26,7 @@ import {
   PressDownKey,
   PressTabKey,
   SaveValue,
+  Wait,
   DateUtils,
   AutomationEvents,
   EVENT_NAMES
@@ -62,6 +63,7 @@ export {
   PressDownKey,
   PressTabKey,
   SaveValue,
+  Wait,
   DateUtils,
   AutomationEvents,
   EVENT_NAMES,

@@ -2,6 +2,71 @@ import { AutomationEvents, EVENT_NAMES } from "./automation";
 import { UIElement, checkElement, hideCheckElementContainer, wait } from "./ui-utils"
 import {v4 as uuidv4} from 'uuid';
 
+const retry = async (currentAction: ActionOnElement | WaitUntilElementRemovedAction, uiElement: UIElement, parentElement: HTMLElement | null, delay = 1000, index = 0, maxTries = 10, untilRemoved = false): Promise<HTMLElement | null > => {
+  console.groupCollapsed(`tries ${index}/${maxTries}`)
+  if (currentAction) {
+    currentAction.updateTries(index)
+    await AbstractAction.notifyActionUpdated(currentAction)
+  }
+  if (index === maxTries) {
+    console.groupEnd()
+    if (untilRemoved) {
+      throw new Error(`UI Element ${uiElement.getElementName() || 'UNKNNOWN'} still present after 10 tries`)
+    } else {
+      throw new Error(`UI Element ${uiElement.getElementName() || 'UNKNNOWN'} not found after 10 tries`)
+    }
+  } else {
+    const elem = uiElement.selector(parentElement, uiElement.postProcess)
+    console.groupEnd()
+    if (elem) {
+      if (untilRemoved) {
+        await wait(delay)
+        return await retry(currentAction, uiElement, parentElement, delay, ++index, maxTries, untilRemoved)
+      } else {
+        console.log('Element found = ', elem)
+        return elem
+      }
+    } else {
+      if (untilRemoved) {
+        console.log('Element removed.')
+        return null
+      } else {
+        await wait(delay)
+        return await retry(currentAction, uiElement, parentElement, delay, ++index, maxTries, untilRemoved)
+      }
+    }
+  }
+}
+
+/**
+   * 
+   * @param uiElement
+   * @param delay of each try. Defaults to 1 second
+   */
+const waitForElement = async (currentAction: ActionOnElement | WaitUntilElementRemovedAction, uiElement: UIElement, delay: number = 1000, maxTries = 10, untilRemoved = false): Promise<HTMLElement | null > => {
+  const elementName = uiElement.getElementName()
+  console.group('Looking for Element: ' + elementName);
+
+  let parentElement: HTMLElement | null = null
+  if (uiElement.parent) {
+    try {
+      console.groupCollapsed('Look for Parent ', uiElement.parent.getElementName())
+      parentElement = await waitForElement(currentAction, uiElement.parent)
+    } catch (e: any) {
+      console.groupEnd() // Look for parent
+      console.groupEnd() // Look for element
+      throw e
+    }    
+  }
+  try {
+    console.log('Using parent element: ', parentElement)
+    const elem = await retry(currentAction, uiElement, parentElement, delay, 0, maxTries, untilRemoved)
+    return elem
+  } catch (e: any) {
+    console.groupEnd()
+    throw e
+  }
+}
 
 interface ActionContext {
   url: string,
@@ -36,7 +101,15 @@ abstract class AbstractAction {
 
   abstract getDescription() : string
 
-  abstract getJSON() : Object
+  getJSON () {
+    return {
+      id: this.id,
+      description: this.getDescription(),
+      context: this.context,
+      status: this.status,
+      error: this.error
+    }
+  }
 
   protected abstract executeAction() : Promise<any>
   protected abstract resetAction() : void
@@ -71,7 +144,7 @@ abstract class AbstractAction {
     } catch (e: any) {
       this.status = 'error'
       this.error = e.message
-      throw new Error('Error in Action ' + this.getDescription() + '. Message: ' + e.message)
+      throw Error('Error in Action ' + this.getDescription() + '. Message: ' + e.message)
     } finally {
       this.context.afterInputValues = this.getInputValuesFromPage()
       this.context.afterHTML = document.body.innerHTML
@@ -119,14 +192,10 @@ class Action extends AbstractAction {
 
   getJSON () {
     return {
-      id: this.id,
+      ...super.getJSON(),
       type: 'Action',
-      description: this.getDescription(),
       params: this.params,
       steps: this.stepsToJSON(),
-      context: this.context,
-      status: this.status,
-      error: this.error
     }
   }
 
@@ -142,10 +211,10 @@ class Action extends AbstractAction {
         await wait(200)
         await action.execute()
         this.index++
+        await this.continue()
       } catch (e) {
         throw e
       }
-      await this.continue()
     }
   }
 
@@ -203,28 +272,41 @@ abstract class ActionOnElement extends AbstractAction {
    * @param uiElement
    * @param delay of each try. Defaults to 1 second
    */
-  static waitForElement (currentAction: ActionOnElement, uiElement: UIElement, delay: number = 1000, maxTries = 10): Promise<HTMLElement> {
+  static waitForElement (currentAction: ActionOnElement, uiElement: UIElement, delay: number = 1000, maxTries = 10, untilRemoved = false): Promise<HTMLElement | null > {
     const elementName = uiElement.getElementName()
     return new Promise(async (resolve, reject) => {
       
       // retry function 
-      const retry = async (parentElement: HTMLElement | null, delay = 1000, index = 0) => {
+      const retry = async (parentElement: HTMLElement | null, delay = 1000, index = 0, untilRemoved = false): Promise<HTMLElement | null > => {
         console.groupCollapsed(`tries ${index}/${maxTries}`)
         currentAction.updateTries(index)
         await AbstractAction.notifyActionUpdated(currentAction)
         if (index === maxTries) {
           console.groupEnd()
-          reject(new Error(`UI Element ${elementName || 'UNKNNOWN'} not found after 10 tries`))
+          if (untilRemoved) {
+            throw new Error(`UI Element ${elementName || 'UNKNNOWN'} still present after 10 tries`)
+          } else {
+            throw new Error(`UI Element ${elementName || 'UNKNNOWN'} not found after 10 tries`)
+          }
         } else {
           const elem = uiElement.selector(parentElement, uiElement.postProcess)
+          console.groupEnd()
           if (elem) {
-            console.groupEnd()
-            console.log('Element found = ', elem)
-            resolve(elem)
+            if (untilRemoved) {
+              await wait(delay)
+              return await retry(parentElement, delay, ++index, untilRemoved)
+            } else {
+              console.log('Element found = ', elem)
+              return elem
+            }
           } else {
-            console.groupEnd()
-            await wait(delay)
-            await retry(parentElement, delay, ++index)
+            if (untilRemoved) {
+              console.log('Element removed.')
+              return null
+            } else {
+              await wait(delay)
+              return await retry(parentElement, delay, ++index, untilRemoved)
+            }
           }
         }
       }
@@ -232,37 +314,49 @@ abstract class ActionOnElement extends AbstractAction {
       console.group('Looking for Element: ' + elementName);
 
       let parentElement: HTMLElement | null = null
+      let parentSuccess = true
       if (uiElement.parent) {
         console.groupCollapsed('Look for Parent ', uiElement.parent.getElementName())
         try {
           parentElement = await ActionOnElement.waitForElement(currentAction, uiElement.parent)
-          console.groupEnd()
-          console.log('using parent element: ', parentElement)
         } catch (e) {
+          parentSuccess = false
+        } finally {
           console.groupEnd()
-          reject(new Error(`Parent ${uiElement.parent.getElementName()} of UI Element ${uiElement.name || 'UNKNNOWN'} not found`))
         }
       }
-
-      await retry(parentElement, delay)
-      console.groupEnd()
+      if (parentSuccess) {
+        console.log('using parent element: ', parentElement)
+        try {
+          const elem = await retry(parentElement, delay, 0, untilRemoved)
+          console.groupEnd()
+          resolve(elem)
+        } catch (e: any) {
+          console.groupEnd()
+          reject(new Error(e.message))
+        }
+      } else {
+        console.groupEnd()
+        reject(new Error(`Parent ${uiElement.parent?.getElementName()} of UI Element ${uiElement.name || 'UNKNNOWN'} not found`))
+      }
     })
   }
 
   async executeAction () {
     try {
-      this.element = await ActionOnElement.waitForElement(this, this.uiElement) as HTMLElement
+      this.element = await waitForElement(this, this.uiElement) as HTMLElement
       this.element?.setAttribute("test-id", this.getElementName());
       await checkElement(this.element, this.getElementName())
       this.executeActionOnElement()
       await hideCheckElementContainer()
     } catch (e: any) {
-      throw new Error(e.message)
+      throw Error(e.message)
     }
   }
 
   resetAction () {
     this.element = null
+    this.tries = 0
   }
 
 }
@@ -394,6 +488,31 @@ class AssertExistsAction extends ActionOnElement {
     return {
       ...super.getJSON(),
       type: 'AssertExistsAction',
+    }
+  }
+}
+
+class AssertNotExistsAction extends ActionOnElement {
+
+  constructor (uiElement: UIElement) {
+    super(uiElement)
+  }
+
+  protected executeActionOnElement () {
+    const exists = !!this.element
+    if (exists) {
+      throw new Error(`Element ${this.getElementName()} was not expected to exist`)
+    }
+  }
+
+  getDescription () {
+    return `Assert that ${this.getElementName()} doesn't exist`
+  }
+
+  getJSON () {
+    return {
+      ...super.getJSON(),
+      type: 'AssertNotExistsAction',
     }
   }
 }
@@ -541,7 +660,7 @@ class PressDownKeyAction extends ActionOnElement {
 
   protected executeActionOnElement () {
     this.element?.dispatchEvent(
-      new KeyboardEvent("keydown", {
+      new KeyboardEvent("keyup", {
         altKey: false,
         code: "Down",
         ctrlKey: false,
@@ -641,6 +760,72 @@ class SaveValueAction extends ActionOnElement {
   }
 }
 
+class WaitAction extends AbstractAction {
+  miliseconds: number
+
+  constructor (miliseconds: number) {
+    super()
+    this.miliseconds = miliseconds
+  }
+
+  getDescription () {
+    return 'Wait ' + this.miliseconds + ' miliseconds'
+  }
+
+  getJSON () {
+    return {
+      ...super.getJSON(),
+      type: 'Wait',
+    }
+  }
+
+  async executeAction () {
+    await wait(this.miliseconds)
+  }
+
+  resetAction () {
+    // nothing to do
+  }
+}
+
+class WaitUntilElementRemovedAction extends AbstractAction {
+  uiElement: UIElement
+  tries: number
+
+  constructor (uiElement: UIElement) {
+    super()
+    this.uiElement = uiElement
+    this.tries = 0
+  }
+
+  updateTries (tries: number) {
+    this.tries = tries
+  }
+  
+  resetAction () {
+    this.tries = 0
+  }
+
+  getElementName () {
+    return this.uiElement.getElementName()
+  }
+
+  protected async executeAction () {
+    await waitForElement(this, this.uiElement, 1000, 10, true) as HTMLElement
+  }
+
+  getDescription () {
+    return 'Wait until ' + this.getElementName() + ' is removed'
+  }
+
+  getJSON () {
+    return {
+      ...super.getJSON(),
+      type: 'WaitUntilElementRemoved',
+    }
+  }
+}
+
 export {
   AbstractAction,
   Action,
@@ -656,5 +841,8 @@ export {
   AssertContainsTextAction,
   AssertValueIsAction,
   AssertExistsAction,
+  AssertNotExistsAction,
   SaveValueAction,
+  WaitAction,
+  WaitUntilElementRemovedAction,
 }

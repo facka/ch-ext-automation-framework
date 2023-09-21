@@ -84,7 +84,7 @@ devToolsCheckElementContainer.style.left = '0px'
 devToolsCheckElementContainer.style.zIndex = '9990'
 devToolsCheckElementContainer.style.display = 'none'
 devToolsCheckElementContainer.style.opacity = '0'
-devToolsCheckElementContainer.style.transition = 'opacity .5s'
+devToolsCheckElementContainer.style.transition = 'opacity .2s'
 body.appendChild(devToolsCheckElementContainer)
 
 const createDarkLayerElement = () => {
@@ -140,12 +140,12 @@ const checkElement = async (elem: HTMLElement, name: string) => {
   
   devToolsCheckElementContainer.style.display = 'block'
   devToolsCheckElementContainer.style.opacity = '1'
-  await wait(500)
+  await wait(200)
 }
 
 const hideCheckElementContainer = async () => {
   devToolsCheckElementContainer.style.opacity = '0'
-  await wait(500)
+  await wait(200)
   devToolsCheckElementContainer.style.display = 'none'
 }
 

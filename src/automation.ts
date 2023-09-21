@@ -1,3 +1,4 @@
+import { groupEnd } from 'console'
 import { 
   AbstractAction,
   Action,
@@ -7,6 +8,7 @@ import {
   AssertContainsTextAction,
   AssertValueIsAction,
   AssertExistsAction,
+  AssertNotExistsAction,
   SelectAction,
   TypeAction,
   TypePasswordAction,
@@ -14,8 +16,11 @@ import {
   PressDownKeyAction,
   PressTabKeyAction,
   SaveValueAction,
+  WaitAction,
+  WaitUntilElementRemovedAction,
 } from './actions'
 import { UIElement, hideCheckElementContainer } from "./ui-utils"
+import { stat } from 'fs'
 
 const formatDate = (date: Date) => {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -50,6 +55,7 @@ const DateUtils = {
 
 class AutomationCompiler {
   static currentAction: Action
+  static isCompiling: boolean
 
   static compileAction (action: Action) {
     const previousAction = AutomationCompiler.currentAction
@@ -59,12 +65,18 @@ class AutomationCompiler {
   }
 
   static addAction (action: AbstractAction) {
+    console.log('Add action: ', action.getDescription())
     AutomationCompiler.currentAction.addStep(action)
   }
 
   static init (startAction: Action) {
     AutomationCompiler.currentAction = startAction
+    AutomationCompiler.isCompiling = true
+    console.groupCollapsed('Compile: ' + startAction.getDescription())
     startAction.compileSteps()
+    AutomationCompiler.isCompiling = false
+    console.log('Compilation finished')
+    console.groupEnd()
   }
 }
 
@@ -74,8 +86,10 @@ enum EVENT_NAMES {
   ACTION_UPDATE = 'action-update',
   SAVE_VALUE = 'save-value',
   REGISTER_TEST = 'register-test',
+  TEST_STARTED = 'test-started',
   TEST_PASSED = 'test-passed',
   TEST_FAILED = 'test-failed',
+  TEST_END = 'test-end'
 }
 
 type AutomationEventHandlerType = ((action?: any) => void)
@@ -103,6 +117,9 @@ class EventDispatcher {
   dispatch(eventName: EVENT_NAMES, data?: any) {
     if (this.events.has(eventName) ) {
       this.events.get(eventName)?.forEach((callback: AutomationEventHandlerType) => {
+        console.groupCollapsed('Dispatch Event: ' + eventName)
+        console.log('Data: ', data)
+        console.groupEnd()
         callback(data)
       })
     }
@@ -117,18 +134,18 @@ class AutomationRunner {
 
   static async start (startAction: Action) {
     AutomationRunner.running = true
-    AutomationCompiler.init(startAction)
+    console.groupCollapsed('Start Action: ', startAction.getDescription())
     AutomationEvents.dispatch(EVENT_NAMES.START, {
       action: startAction?.getJSON(),
     })
-
     try {
       await startAction?.execute()
     } catch (e: any) {
-      await hideCheckElementContainer()
+      hideCheckElementContainer()
       console.error(`🤖 Error running task ${startAction.getDescription()}. Reason: ${e.message}`)
       throw e
     } finally {
+      console.groupEnd()
       AutomationRunner.running = false
       AutomationEvents.dispatch(EVENT_NAMES.END, {})
     }
@@ -138,20 +155,24 @@ class AutomationRunner {
 const TestsMap: any = {}
 
 const Test = (id: string, steps: () => void) => {
-  const testCode = () => {
-    const action = new Action(id, steps)
+  const action = new Action(id, steps)
+  AutomationCompiler.init(action)
+  const testCode = async () => {
     if (!AutomationRunner.running) {
       try {
-        AutomationRunner.start(action)
+        AutomationEvents.dispatch(EVENT_NAMES.TEST_STARTED, { action: action.getJSON() })
+        await AutomationRunner.start(action)
         AutomationEvents.dispatch(EVENT_NAMES.TEST_PASSED, { id })
       } catch (e) {
         AutomationEvents.dispatch(EVENT_NAMES.TEST_FAILED, { id })
+      } finally {
+        AutomationEvents.dispatch(EVENT_NAMES.TEST_END, { id })
       }
     } else {
       throw new Error('Not able to run test while other test is running.')
     }
   }
-  AutomationEvents.dispatch(EVENT_NAMES.REGISTER_TEST, { id }) // TODO send action json
+  AutomationEvents.dispatch(EVENT_NAMES.REGISTER_TEST, { id, action: action.getJSON() })
   TestsMap[id] = testCode
 }
 
@@ -164,12 +185,13 @@ const RunTest = (id: string) => {
 }
 
 const Task = (id: string, steps: (params?: any) => void) => {
-  return (params?: any) => {
+  return async (params?: any) => {
     const action = new Action(id, steps)
     action.setParams(params)
-    if (!AutomationRunner.running) {
+    if (!AutomationRunner.running && !AutomationCompiler.isCompiling) {
       try {
-        AutomationRunner.start(action)
+        AutomationCompiler.init(action)
+        await AutomationRunner.start(action)
       } catch (e) {
         console.log('Error running task ' + id)
       }
@@ -188,20 +210,19 @@ const Click = (uiElement: UIElement) => {
 const Assert = (uiElement: UIElement) => {
   return {
     textIs: (text: string) => {
-      const action = new AssertTextIsAction(uiElement, text)
-      AutomationCompiler.addAction(action)
+      AutomationCompiler.addAction(new AssertTextIsAction(uiElement, text))
     },
     containsText: (text: string) => {
-      const action = new AssertContainsTextAction(uiElement, text)
-      AutomationCompiler.addAction(action)
+      AutomationCompiler.addAction(new AssertContainsTextAction(uiElement, text))
     },
     valueIs: (value: string) => {
-      const action = new AssertValueIsAction(uiElement, value)
-      AutomationCompiler.addAction(action)
+      AutomationCompiler.addAction(new AssertValueIsAction(uiElement, value))
     },
     exists: () => {
-      const action = new AssertExistsAction(uiElement)
-      AutomationCompiler.addAction(action)
+      AutomationCompiler.addAction(new AssertExistsAction(uiElement))
+    },
+    notExists: () => {
+      AutomationCompiler.addAction(new AssertNotExistsAction(uiElement))
     }
   }
 }
@@ -275,6 +296,17 @@ const SaveValue = (uiElement: UIElement) => {
   }
 }
 
+const Wait = (miliseconds: number) => {
+  AutomationCompiler.addAction(new WaitAction(miliseconds))
+}
+
+Wait.untilElement = (uiElement: UIElement) => {
+  return {
+    isRemoved: () => {
+      AutomationCompiler.addAction(new WaitUntilElementRemovedAction(uiElement))
+    }
+  }
+}
 
 // TODO add wait action     
 
@@ -292,6 +324,7 @@ export {
   PressDownKey,
   PressTabKey,
   SaveValue,
+  Wait,
   DateUtils,
   AutomationEvents,
   EVENT_NAMES,
