@@ -1,15 +1,21 @@
 ## Tom - Framework for automating tasks in browsers
 
-Tom is a framework to create automated tasks in a browser.
+Tom is an innovative framework designed for streamlining the automation of tasks within a web browser environment.
 
-The idea of this framework is to be used on a Chrome extension to facilitate the managment of the tests and execution log.
+The core concept behind Tom is its seamless integration as a Chrome extension, offering an efficient solution for test management and execution log handling.
 
 ## Installation
 
-In progress...
+Clone project locally and link it to your project.
 
+At `ch-ext-automation-framework` run
 ```bash
-npm install ch-ext-automation-framework
+npm link 
+```
+
+In your project run
+```bash
+npm link ch-ext-automation-framework
 ```
 
 ## Usage
