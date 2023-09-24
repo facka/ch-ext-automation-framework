@@ -35,8 +35,6 @@ import {
 
 import {
  wait,
- logAction,
- displayContext
 } from './ui-utils';
 
 export {
@@ -70,6 +68,4 @@ export {
   AutomationEvents,
   EVENT_NAMES,
   wait,
-  logAction,
-  displayContext
 };
