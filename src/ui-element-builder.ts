@@ -1,4 +1,30 @@
-import { UIElement } from './ui-utils'
+class UIElement {
+  name: string
+  selector: (parent?: HTMLElement | null,  postProcessFn?: (elem: HTMLElement) => (HTMLElement | null)) => HTMLElement | null
+  parent: UIElement | null
+  postProcess?: ((elem: HTMLElement) => (HTMLElement | null))
+
+  constructor (name: string, selector: () => HTMLElement | null, parent?: UIElement | null, postProcessFn?: (elem: HTMLElement) => (HTMLElement | null)) {
+    this.name = name
+    this.selector = selector
+    this.parent = parent || null
+    this.postProcess = postProcessFn
+  }
+
+  getElementName (): string {
+    let parent = ''
+    if (this.parent) {
+      parent = ' in ' + this.parent.getElementName()
+    }
+    return `${this.name}${parent}`
+  }
+}
+
+let document: Document
+
+const setDocument = (doc: Document) => {
+  document = doc
+}
 
 const SelectorBuilder = (query: string, filterFn?: (value: HTMLElement, index: number, array: readonly HTMLElement[]) => Boolean) => {
   const selector = (root = document, postProcess?: (elem: HTMLElement) => HTMLElement) => {
@@ -95,7 +121,9 @@ const classIncludes = (className: string) => {
 }
 
 const innerTextIs = (text: string) => {
-  return (elem: HTMLElement) => elem.innerText.trim() == text
+  return (elem: HTMLElement) => {
+    return elem.textContent?.trim() == text
+  }
 }
 
 const innerTextContains = (text: string) => {
@@ -131,6 +159,8 @@ const is = {
 }
 
 export {
+  setDocument,
+  UIElement,
   SelectorBuilder,
   is,
   classIs,

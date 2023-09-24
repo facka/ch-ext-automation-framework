@@ -1,4 +1,3 @@
-import { groupEnd } from 'console'
 import { 
   AbstractAction,
   Action,
@@ -19,40 +18,9 @@ import {
   WaitAction,
   WaitUntilElementRemovedAction,
 } from './actions'
-import { UIElement, hideCheckElementContainer } from "./ui-utils"
-import { stat } from 'fs'
-
-const formatDate = (date: Date) => {
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })
-}
-
-const setDateFromToday = (numberOfDays: number) => {
-  const date = new Date()
-  return formatDate(new Date(date.setDate(date.getDate() + numberOfDays)))
-}
-
-const setMonthFromToday = (numberOfMonths: number) => {
-  const date = new Date()
-  return formatDate(new Date(date.setMonth(date.getMonth() + numberOfMonths)))
-}
-
-const tomorrow = setDateFromToday(1)
-const yesterday = setDateFromToday(-1)
-const nextWeek = setDateFromToday(7)
-const lastWeek = setDateFromToday(-7)
-const nextMonth = setMonthFromToday(1)
-const lastMonth = setMonthFromToday(-1)
-
-const DateUtils = {
-  today: formatDate(new Date()),
-  tomorrow,
-  nextWeek,
-  nextMonth,
-  yesterday,
-  lastWeek,
-  lastMonth
-}
-
+import { UIUtils } from "./ui-utils"
+import { UIElement, setDocument } from './ui-element-builder'
+import DateUtils from './date-utils'
 class AutomationCompiler {
   static currentAction: Action
   static isCompiling: boolean
@@ -128,7 +96,6 @@ class EventDispatcher {
 
 const AutomationEvents = new EventDispatcher()
 
-
 class AutomationRunner {
   static running = false
 
@@ -141,7 +108,7 @@ class AutomationRunner {
     try {
       await startAction?.execute()
     } catch (e: any) {
-      hideCheckElementContainer()
+      AutomationInstance.uiUtils.hideCheckElementContainer()
       console.error(`🤖 Error running task ${startAction.getDescription()}. Reason: ${e.message}`)
       throw e
     } finally {
@@ -192,8 +159,8 @@ const Task = (id: string, steps: (params?: any) => void) => {
       try {
         AutomationCompiler.init(action)
         await AutomationRunner.start(action)
-      } catch (e) {
-        console.log('Error running task ' + id)
+      } catch (e: any) {
+        console.log('Error running task ' + id + '. ' + e.message)
       }
     } else {
       AutomationCompiler.addAction(action)
@@ -308,9 +275,46 @@ Wait.untilElement = (uiElement: UIElement) => {
   }
 }
 
-// TODO add wait action     
+class Automation {
+  private _document: Document
+  debug: Boolean
+  private _uiUtils: UIUtils
+
+  constructor(window: Window) {
+    this._document = window.document
+    this.debug = true
+    this._uiUtils = new UIUtils(window)
+  }
+
+  public get document() {
+    return this._document
+  }
+
+  public get uiUtils() {
+    return this._uiUtils
+  }
+
+  setDebug(value: Boolean) {
+    this.debug = value
+  }
+
+  log(value: string) {
+    if (this.debug) {
+      console.log(value)
+    }
+  }
+}
+
+let AutomationInstance: Automation
+
+const Setup = (document: Document) => {
+  AutomationInstance = new Automation(document)
+  setDocument(AutomationInstance.document)
+}
 
 export {
+  Setup,
+  AutomationInstance,
   Test,
   RunTest,
   Task,

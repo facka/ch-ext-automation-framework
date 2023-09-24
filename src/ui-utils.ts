@@ -1,24 +1,4 @@
-class UIElement {
-  name: string
-  selector: (parent?: HTMLElement | null,  postProcessFn?: (elem: HTMLElement) => (HTMLElement | null)) => HTMLElement | null
-  parent: UIElement | null
-  postProcess?: ((elem: HTMLElement) => (HTMLElement | null))
-
-  constructor (name: string, selector: () => HTMLElement | null, parent?: UIElement | null, postProcessFn?: (elem: HTMLElement) => (HTMLElement | null)) {
-    this.name = name
-    this.selector = selector
-    this.parent = parent || null
-    this.postProcess = postProcessFn
-  }
-
-  getElementName (): string {
-    let parent = ''
-    if (this.parent) {
-      parent = ' in ' + this.parent.getElementName()
-    }
-    return `${this.name}${parent}`
-  }
-}
+import { AutomationInstance } from "./automation"
 
 const wait = (timeout = 2000) => {
   return new Promise((resolve) => {
@@ -39,128 +19,217 @@ const updateStyle = (elem: HTMLElement, props: any) => {
   })
 }
 
-const devToolsMessageContainer = document.createElement('DIV')
-const body = document.body
-devToolsMessageContainer.id = 'dev-tools-message-container'
-devToolsMessageContainer.style.width = '500px'
-devToolsMessageContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'
-devToolsMessageContainer.style.color = 'white'
-// devToolsMessageContainer.style.border = '1px solid black'
-// devToolsMessageContainer.style['border-radius'] = '5px'
-devToolsMessageContainer.style.position = 'fixed'
-devToolsMessageContainer.style.bottom = '10px'
-devToolsMessageContainer.style.right = '10px'
-devToolsMessageContainer.style.fontFamily = 'monospace'
-devToolsMessageContainer.style.zIndex = '9999'
-body.appendChild(devToolsMessageContainer)
+type ElementProps = {
+    id: string,
+    styles?: any,
+    parent: HTMLElement
+}
 
-/**
- * 
- * @param message @deprecated
- */
-const logAction = async (message: string) => {
-  const messageElem = document.createElement('DIV')
-  messageElem.innerText = message
-  messageElem.style.padding = '3px 10px'
-  messageElem.style.opacity = '1'
-  messageElem.style.transition = 'opacity 1s'
-  devToolsMessageContainer.appendChild(messageElem)
-  setTimeout(() => {
+type HTMLTags = 'DIV'
+
+class UIUtils {
+  window: Window
+  document: Document
+  devToolsMessageContainer: HTMLElement
+  devToolsCheckElementContainer: HTMLElement
+  darkLayerLeft: HTMLElement
+  darkLayerTop: HTMLElement
+  darkLayerRight: HTMLElement
+  darkLayerBottom: HTMLElement
+  currentCheckElem: HTMLElement
+  contextViewerContainer: HTMLElement
+
+  constructor (window: Window) {
+    this.document = window.document
+    this.window = window
+    this.devToolsMessageContainer = this.createElement('DIV', {
+      id: 'dev-tools-message-container',
+      styles: {
+        width: '500px',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        color: 'white',
+        position: 'fixed',
+        bottom: '10px',
+        right: '10px',
+        fontFamily: 'monospace',
+        zIndex: '9999',
+      },
+      parent: this.document.body
+    })
+
+    this.devToolsCheckElementContainer = this.createElement('DIV', {
+      id: 'dev-tools-check-element-container',
+      styles: {
+        width:'100%',
+        height: this.document.body.clientHeight+'px',
+        position: 'absolute',
+        top: '0px',
+        left: '0px',
+        zIndex: '9990',
+        display: 'none',
+        opacity: '0',
+        transition: 'opacity .2s',
+      },
+      parent: this.document.body
+    })
+
+    const darkLayerStyle = {
+      zIndex: '9991',
+      backgroundColor: 'rgba(0,0,0,0.3)',
+      position: 'absolute',
+    }
+    
+    this.darkLayerLeft = this.createElement('DIV', {
+      id: 'dark-layer-left',
+      styles: darkLayerStyle,
+      parent: this.devToolsCheckElementContainer,
+    })
+    this.darkLayerTop = this.createElement('DIV', {
+      id: 'dark-layer-top',
+      styles: darkLayerStyle,
+      parent: this.devToolsCheckElementContainer,
+    })
+    this.darkLayerRight = this.createElement('DIV', {
+      id: 'dark-layer-right',
+      styles: darkLayerStyle,
+      parent: this.devToolsCheckElementContainer,
+    })
+    this.darkLayerBottom = this.createElement('DIV', {
+      id: 'dark-layer-bottom',
+      styles: darkLayerStyle,
+      parent: this.devToolsCheckElementContainer,
+    })
+    this.currentCheckElem = this.createElement('DIV', {
+      id: 'current-check-elem',
+      parent: this.devToolsCheckElementContainer,
+    })
+
+    this.contextViewerContainer = this.createElement('DIV', {
+      id: 'context-viewer-container',
+      styles: {
+        width: '100%',
+        height: this.document.body.clientHeight+'px',
+        position: 'absolute',
+        top: '0px',
+        left: '0px',
+        zIndex: '10000',
+        display: 'none',
+      },
+      parent: this.document.body
+    })
+  }
+
+  private createElement (tagName: HTMLTags, props?: ElementProps) {
+    const elem = this.document.createElement(tagName)
+    if (props) {
+      if (props.id) elem.id = props?.id
+      if (props.styles) updateStyle(elem, props.styles)
+      if (props.parent) props.parent.appendChild(elem)
+    }
+    return elem
+  }
+
+  /**
+   * 
+   * @param message @deprecated
+   */
+  async logAction (message: string) {
+    const messageElem = AutomationInstance.document.createElement('DIV')
+    messageElem.innerText = message
+    updateStyle(messageElem, {
+      padding: '3px 10px',
+      opacity: '1',
+      transition: 'opacity 1s',
+    })
+    this.devToolsMessageContainer.appendChild(messageElem)
+    await wait(4000)
     messageElem.style.opacity = '0'
-  }, 4000)
-  setTimeout(() => {
-    devToolsMessageContainer.removeChild(messageElem)
-  }, 5000)
-  await wait(1000)
-}
+    await wait(4000)
+    this.devToolsMessageContainer.removeChild(messageElem)
+    await wait(1000)
+  }
 
-const devToolsCheckElementContainer = document.createElement('DIV')
-devToolsCheckElementContainer.id = 'dev-tools-check-element-container'
-devToolsCheckElementContainer.style.width = '100%'
-devToolsCheckElementContainer.style.height = document.body.clientHeight+'px'
-devToolsCheckElementContainer.style.position = 'absolute'
-devToolsCheckElementContainer.style.top = '0px'
-devToolsCheckElementContainer.style.left = '0px'
-devToolsCheckElementContainer.style.zIndex = '9990'
-devToolsCheckElementContainer.style.display = 'none'
-devToolsCheckElementContainer.style.opacity = '0'
-devToolsCheckElementContainer.style.transition = 'opacity .2s'
-body.appendChild(devToolsCheckElementContainer)
-
-const createDarkLayerElement = () => {
-  const elem = document.createElement('DIV')
-  elem.style.zIndex = '9991'
-  elem.style.backgroundColor = 'rgba(0,0,0,0.3)'
-  elem.style.position = 'absolute'
-  devToolsCheckElementContainer.appendChild(elem)
-  return elem
-}
-
-const darkLayerLeft = createDarkLayerElement()
-const darkLayerTop = createDarkLayerElement()
-const darkLayerRight = createDarkLayerElement()
-const darkLayerBottom = createDarkLayerElement()
-const currentCheckElem = document.createElement('DIV')
-devToolsCheckElementContainer.appendChild(currentCheckElem)
-
-const checkElement = async (elem: HTMLElement, name: string) => {
-  if (!elem) return
-  const rect = elem.getBoundingClientRect()
-
-  darkLayerLeft.style.left = '0px'
-  darkLayerLeft.style.top = rect.top+'px'
-  darkLayerLeft.style.width = (window.scrollX+rect.left)+'px'
-  darkLayerLeft.style.height = rect.height+'px'
-
-  const bodyBundingRect = body.getBoundingClientRect()
-
-  darkLayerTop.style.left = window.scrollX+'px'
-  darkLayerTop.style.top = '0px'
-  darkLayerTop.style.width = '100%'
-  darkLayerTop.style.height = (rect.top)+'px'
-
-  darkLayerRight.style.left = (window.scrollX+rect.left+rect.width)+'px'
-  darkLayerRight.style.top = rect.top+'px'
-  darkLayerRight.style.width = (bodyBundingRect.width - (rect.left + rect.width))+'px'
-  darkLayerRight.style.height = rect.height+'px'
-
-  darkLayerBottom.style.left = window.scrollX+'px'
-  darkLayerBottom.style.top = (rect.top+rect.height)+'px'
-  darkLayerBottom.style.width = '100%'
-  darkLayerBottom.style.height = (bodyBundingRect.height - (rect.top + rect.height))+'px'
-
-  currentCheckElem.id = `dev-tools-current-check-elem-${name}`
-  currentCheckElem.style.top = rect.top+'px'
-  currentCheckElem.style.left = (window.scrollX+rect.left)+'px'
-  currentCheckElem.style.height = rect.height+'px'
-  currentCheckElem.style.width = rect.width+'px'
-  currentCheckElem.style.boxShadow = '0px 0px 5px 2px lightgreen'
-  currentCheckElem.style.position = 'absolute'
-  currentCheckElem.style.zIndex = '9992'
+  async checkElement (elem: HTMLElement, name: string) {
+    if (!elem) return
+    const rect = elem.getBoundingClientRect()
+    const bodyBundingRect = this.document.body.getBoundingClientRect()
   
-  devToolsCheckElementContainer.style.display = 'block'
-  devToolsCheckElementContainer.style.opacity = '1'
-  await wait(200)
-}
+    this.darkLayerLeft.style.left = '0px'
+    this.darkLayerLeft.style.top = rect.top+'px'
+    this.darkLayerLeft.style.width = (this.window.scrollX+rect.left)+'px'
+    this.darkLayerLeft.style.height = rect.height+'px'
+  
+    this.darkLayerTop.style.left = this.window.scrollX+'px'
+    this.darkLayerTop.style.top = '0px'
+    this.darkLayerTop.style.width = '100%'
+    this.darkLayerTop.style.height = (rect.top)+'px'
+  
+    this.darkLayerRight.style.left = (this.window.scrollX+rect.left+rect.width)+'px'
+    this.darkLayerRight.style.top = rect.top+'px'
+    this.darkLayerRight.style.width = (bodyBundingRect.width - (rect.left + rect.width))+'px'
+    this.darkLayerRight.style.height = rect.height+'px'
+  
+    this.darkLayerBottom.style.left = this.window.scrollX+'px'
+    this.darkLayerBottom.style.top = (rect.top+rect.height)+'px'
+    this.darkLayerBottom.style.width = '100%'
+    this.darkLayerBottom.style.height = (bodyBundingRect.height - (rect.top + rect.height))+'px'
+  
+    this.currentCheckElem.id = `dev-tools-current-check-elem-${name}`
+    this.currentCheckElem.style.top = rect.top+'px'
+    this.currentCheckElem.style.left = (this.window.scrollX+rect.left)+'px'
+    this.currentCheckElem.style.height = rect.height+'px'
+    this.currentCheckElem.style.width = rect.width+'px'
+    this.currentCheckElem.style.boxShadow = '0px 0px 5px 2px lightgreen'
+    this.currentCheckElem.style.position = 'absolute'
+    this.currentCheckElem.style.zIndex = '9992'
+    
+    this.devToolsCheckElementContainer.style.display = 'block'
+    this.devToolsCheckElementContainer.style.opacity = '1'
+    await wait(200)
+  }
 
-const hideCheckElementContainer = async () => {
-  devToolsCheckElementContainer.style.opacity = '0'
-  await wait(200)
-  devToolsCheckElementContainer.style.display = 'none'
-}
+  async hideCheckElementContainer () {
+    this.devToolsCheckElementContainer.style.opacity = '0'
+    await wait(200)
+    this.devToolsCheckElementContainer.style.display = 'none'
+  }
 
-const contextViewerContainer = document.createElement('DIV')
-contextViewerContainer.id = 'context-viewer-container'
-updateStyle(contextViewerContainer, {
-  width: '100%',
-  height: document.body.clientHeight+'px',
-  position: 'absolute',
-  top: '0px',
-  left: '0px',
-  zIndex: '10000',
-  display: 'none',
-})
-body.appendChild(contextViewerContainer)
+  displayContext(context: any) {
+    updateStyle(this.contextViewerContainer, {display: 'flex'})
+    const contextViewerBefore = this.document.createElement('DIV')
+    contextViewerBefore.id = 'context-viewer-before'
+    updateStyle(contextViewerBefore, {
+      flex: '50%',
+      width: '100%',
+      height: 'auto',
+    })
+    const contextViewerAfter = this.document.createElement('DIV')
+    contextViewerAfter.id = 'context-viewer-after'
+    updateStyle(contextViewerAfter, {
+      flex: '50%',
+      width: '100%',
+      height: 'auto',
+    })
+    const beforeHTML = this.document.createElement('DIV')
+    beforeHTML.innerHTML = context.beforeHTML
+    setInputValues(beforeHTML, context.beforeInputValues)
+    const afterHTML = this.document.createElement('DIV')
+    afterHTML.innerHTML = context.afterHTML
+    setInputValues(afterHTML, context.afterInputValues)
+    this.contextViewerContainer.appendChild(contextViewerBefore)
+    contextViewerBefore.appendChild(beforeHTML)
+    setTimeout(() => {
+      this.contextViewerContainer.removeChild(contextViewerBefore)
+      this.contextViewerContainer.appendChild(contextViewerAfter)
+      contextViewerAfter.appendChild(afterHTML)
+      setTimeout(() => {
+        this.contextViewerContainer.removeChild(contextViewerAfter)
+        updateStyle(this.contextViewerContainer, {display: 'none'})
+      }, 2000)
+    }, 2000)
+  }
+} 
+
 
 const setInputValues = (html: HTMLElement, valuesMap: any) => {
   html.querySelectorAll('input').forEach((input: HTMLInputElement) => {
@@ -169,46 +238,7 @@ const setInputValues = (html: HTMLElement, valuesMap: any) => {
   })
 }
 
-const displayContext = (context: any) => {
-  updateStyle(contextViewerContainer, {display: 'flex'})
-  const contextViewerBefore = document.createElement('DIV')
-  contextViewerBefore.id = 'context-viewer-before'
-  updateStyle(contextViewerBefore, {
-    flex: '50%',
-    width: '100%',
-    height: 'auto',
-  })
-  const contextViewerAfter = document.createElement('DIV')
-  contextViewerAfter.id = 'context-viewer-after'
-  updateStyle(contextViewerAfter, {
-    flex: '50%',
-    width: '100%',
-    height: 'auto',
-  })
-  const beforeHTML = document.createElement('DIV')
-  beforeHTML.innerHTML = context.beforeHTML
-  setInputValues(beforeHTML, context.beforeInputValues)
-  const afterHTML = document.createElement('DIV')
-  afterHTML.innerHTML = context.afterHTML
-  setInputValues(afterHTML, context.afterInputValues)
-  contextViewerContainer.appendChild(contextViewerBefore)
-  contextViewerBefore.appendChild(beforeHTML)
-  setTimeout(() => {
-    contextViewerContainer.removeChild(contextViewerBefore)
-    contextViewerContainer.appendChild(contextViewerAfter)
-    contextViewerAfter.appendChild(afterHTML)
-    setTimeout(() => {
-      contextViewerContainer.removeChild(contextViewerAfter)
-      updateStyle(contextViewerContainer, {display: 'none'})
-    }, 2000)
-  }, 2000)
-}
-
 export {
   wait,
-  logAction,
-  UIElement,
-  checkElement,
-  hideCheckElementContainer,
-  displayContext,
+  UIUtils
 }

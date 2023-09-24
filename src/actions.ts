@@ -1,6 +1,7 @@
-import { AutomationEvents, EVENT_NAMES } from "./automation";
-import { UIElement, checkElement, hideCheckElementContainer, wait } from "./ui-utils"
-import {v4 as uuidv4} from 'uuid';
+import { AutomationEvents, EVENT_NAMES, AutomationInstance} from "./automation";
+import { UIElement } from "./ui-element-builder";
+import { v4 as uuidv4 } from 'uuid';
+import { wait } from "./ui-utils";
 
 const retry = async (currentAction: ActionOnElement | WaitUntilElementRemovedAction, uiElement: UIElement, parentElement: HTMLElement | null, delay = 1000, index = 0, maxTries = 10, untilRemoved = false): Promise<HTMLElement | null > => {
   console.groupCollapsed(`tries ${index}/${maxTries}`)
@@ -122,7 +123,7 @@ abstract class AbstractAction {
 
   private getInputValuesFromPage() {
     const inputsMap: any = {}
-    const inputs = document.querySelectorAll('input')
+    const inputs = AutomationInstance.document.querySelectorAll('input')
     inputs.forEach((input, index) => {
       const id = `value-id-${index}`
       input.setAttribute('input-id', id);
@@ -135,7 +136,7 @@ abstract class AbstractAction {
     try {
       this.status = 'running'
       this.context.beforeInputValues = this.getInputValuesFromPage()
-      this.context.beforeHTML = document.body.innerHTML
+      this.context.beforeHTML = AutomationInstance.document.body.innerHTML
       await AbstractAction.notifyActionUpdated(this)
       console.log('Action: ', this.getDescription())
       await this.executeAction()
@@ -147,7 +148,7 @@ abstract class AbstractAction {
       throw Error('Error in Action ' + this.getDescription() + '. Message: ' + e.message)
     } finally {
       this.context.afterInputValues = this.getInputValuesFromPage()
-      this.context.afterHTML = document.body.innerHTML
+      this.context.afterHTML = AutomationInstance.document.body.innerHTML
       await AbstractAction.notifyActionUpdated(this)
     }
   }
@@ -346,9 +347,9 @@ abstract class ActionOnElement extends AbstractAction {
     try {
       this.element = await waitForElement(this, this.uiElement) as HTMLElement
       this.element?.setAttribute("test-id", this.getElementName());
-      await checkElement(this.element, this.getElementName())
+      await AutomationInstance.uiUtils.checkElement(this.element, this.getElementName())
       this.executeActionOnElement()
-      await hideCheckElementContainer()
+      await AutomationInstance.uiUtils.hideCheckElementContainer()
     } catch (e: any) {
       throw Error(e.message)
     }
