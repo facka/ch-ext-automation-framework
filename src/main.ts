@@ -13,6 +13,7 @@ import {
 } from './ui-element-builder';
 
 import {
+  Setup,
   Test,
   RunTest,
   Task,
@@ -50,6 +51,7 @@ export {
   isFirstElement,
   elementIndexIs,
   firstChildTextIs,
+  Setup,
   Test,
   RunTest,
   Task,
