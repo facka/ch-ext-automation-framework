@@ -307,9 +307,11 @@ class Automation {
 
 let AutomationInstance: Automation
 
-const Setup = (document: Document) => {
-  AutomationInstance = new Automation(document)
+const Setup = (window: Window) => {
+  AutomationInstance = new Automation(window)
   setDocument(AutomationInstance.document)
+
+  // TODO add test list and execute them
 }
 
 export {
