@@ -150,6 +150,18 @@ const firstChildTextIs = (text: string) => {
   return (elem: HTMLElement) => (elem?.firstChild as HTMLInputElement).innerText.trim() === text
 }
 
+const and = (conditions: any[]) => {
+  return (elem: HTMLElement, elemIndex: number) => {
+    let response = true
+    let i = 0
+    while (response && i < conditions.length) {
+      response = response && conditions[i](elem, elemIndex)
+      i++
+    }
+    return response
+  }
+}
+
 const is = {
   DIV,
   BUTTON,
@@ -171,5 +183,6 @@ export {
   placeholderIs,
   isFirstElement,
   elementIndexIs,
-  firstChildTextIs
+  firstChildTextIs,
+  and
 }

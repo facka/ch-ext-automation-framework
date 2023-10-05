@@ -9,7 +9,8 @@ import {
   placeholderIs,
   isFirstElement,
   elementIndexIs,
-  firstChildTextIs
+  firstChildTextIs,
+  and,
 } from './ui-element-builder';
 
 import {
@@ -51,6 +52,7 @@ export {
   isFirstElement,
   elementIndexIs,
   firstChildTextIs,
+  and,
   Setup,
   Test,
   RunTest,
