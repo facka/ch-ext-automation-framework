@@ -96,6 +96,12 @@ class EventDispatcher {
 
 const AutomationEvents = new EventDispatcher()
 
+enum TestSpeed {
+  SLOW = 2000,
+  NORMAL = 1000,
+  FAST = 200
+}
+
 class AutomationRunner {
   static running = false
 
@@ -279,11 +285,13 @@ class Automation {
   private _document: Document
   debug: Boolean
   private _uiUtils: UIUtils
+  speed: TestSpeed
 
   constructor(window: Window) {
     this._document = window.document
     this.debug = true
     this._uiUtils = new UIUtils(window)
+    this.speed = TestSpeed.NORMAL
   }
 
   public get document() {
@@ -334,4 +342,5 @@ export {
   DateUtils,
   AutomationEvents,
   EVENT_NAMES,
+  TestSpeed,
 }

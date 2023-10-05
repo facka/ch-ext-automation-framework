@@ -211,7 +211,7 @@ class Action extends AbstractAction {
     if (this.index < this.steps.length) {
       const action = this.steps[this.index]
       try {
-        await wait(200)
+        await wait(AutomationInstance.speed)
         await action.execute()
         this.index++
         await this.continue()
