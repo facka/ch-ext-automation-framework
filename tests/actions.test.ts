@@ -19,7 +19,7 @@ test('Test click button', async () => {
       <button>Click me!</button>
     </div
   `));
-  Setup(window)
+  await Setup(window)
 
   actions.clickButtonTest()
 

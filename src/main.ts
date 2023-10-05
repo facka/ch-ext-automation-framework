@@ -30,7 +30,8 @@ import {
   Wait,
   DateUtils,
   AutomationEvents,
-  EVENT_NAMES
+  AutomationInstance,
+  EVENT_NAMES,
   TestSpeed,
 } from './automation';
 
@@ -67,6 +68,7 @@ export {
   Wait,
   DateUtils,
   AutomationEvents,
+  AutomationInstance,
   EVENT_NAMES,
   TestSpeed,
   wait,

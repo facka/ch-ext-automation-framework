@@ -85,9 +85,7 @@ class EventDispatcher {
   dispatch(eventName: EVENT_NAMES, data?: any) {
     if (this.events.has(eventName) ) {
       this.events.get(eventName)?.forEach((callback: AutomationEventHandlerType) => {
-        console.groupCollapsed('Dispatch Event: ' + eventName)
-        console.log('Data: ', data)
-        console.groupEnd()
+        console.log(`Dispatch Event ${eventName}:`, data)
         callback(data)
       })
     }
@@ -315,11 +313,14 @@ class Automation {
 
 let AutomationInstance: Automation
 
-const Setup = (window: Window) => {
+const Setup = (window: Window, tests?: Array<any>) => {
+  if (AutomationInstance) {
+    throw new Error('Automation Setup already executed.')
+  }
   AutomationInstance = new Automation(window)
   setDocument(AutomationInstance.document)
 
-  // TODO add test list and execute them
+  tests?.forEach((installerFn) => installerFn())
 }
 
 export {
