@@ -53,6 +53,7 @@ const waitForElement = async (currentAction: ActionOnElement | WaitUntilElementR
     try {
       console.groupCollapsed('Look for Parent ', uiElement.parent.getElementName())
       parentElement = await waitForElement(currentAction, uiElement.parent)
+      console.groupEnd()
     } catch (e: any) {
       console.groupEnd() // Look for parent
       console.groupEnd() // Look for element
@@ -62,6 +63,7 @@ const waitForElement = async (currentAction: ActionOnElement | WaitUntilElementR
   try {
     console.log('Using parent element: ', parentElement)
     const elem = await retry(currentAction, uiElement, parentElement, delay, 0, maxTries, untilRemoved)
+    console.groupEnd()
     return elem
   } catch (e: any) {
     console.groupEnd()
