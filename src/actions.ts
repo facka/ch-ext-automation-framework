@@ -4,6 +4,19 @@ import { v4 as uuidv4 } from 'uuid';
 import { wait } from "./ui-utils";
 
 const retry = async (currentAction: ActionOnElement | WaitUntilElementRemovedAction, uiElement: UIElement, parentElement: HTMLElement | null, delay = 1000, index = 0, maxTries = 10, untilRemoved = false): Promise<HTMLElement | null > => {
+
+  console.log('Automation Status: ', AutomationInstance.status)
+  if (AutomationInstance.status == 'Paused') {
+    return new Promise<HTMLElement | null >((resolve, reject) => {
+      AutomationInstance.saveCurrentAction(async () => {
+        const response = await retry(currentAction, uiElement, parentElement, delay, index, maxTries, untilRemoved)
+        resolve(response)
+      })
+    })
+  }
+  if (AutomationInstance.status == 'Stopped') {
+    throw new Error('Test stopped manually')
+  }
   console.groupCollapsed(`tries ${index}/${maxTries}`)
   if (currentAction) {
     currentAction.updateTries(index)
@@ -208,6 +221,17 @@ class Action extends AbstractAction {
   }
 
   async continue () {
+    if (AutomationInstance.status == 'Paused') {
+      return new Promise<void>((resolve, reject) => {
+        AutomationInstance.saveCurrentAction(async () => {
+          await this.continue()
+          resolve()
+        })
+      })
+    }
+    if (AutomationInstance.status == 'Stopped') {
+      throw new Error('Test stopped manually')
+    }
     if (this.index < this.steps.length) {
       const action = this.steps[this.index]
       try {

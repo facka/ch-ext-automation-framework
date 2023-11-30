@@ -100,11 +100,19 @@ enum TestSpeed {
   FAST = 200
 }
 
+enum TestPlayStatus {
+  PLAYING = 'Playing',
+  STOPPED = 'Stopped',
+  PAUSED = 'Paused'
+}
+
+
 class AutomationRunner {
   static running = false
 
   static async start (startAction: Action) {
     AutomationRunner.running = true
+    AutomationInstance.status = TestPlayStatus.PLAYING
     console.groupCollapsed('Start Action: ', startAction.getDescription())
     AutomationEvents.dispatch(EVENT_NAMES.START, {
       action: startAction?.getJSON(),
@@ -118,7 +126,9 @@ class AutomationRunner {
     } finally {
       console.groupEnd()
       AutomationRunner.running = false
-      AutomationEvents.dispatch(EVENT_NAMES.END, {})
+      AutomationEvents.dispatch(EVENT_NAMES.END, {
+        action: startAction?.getJSON()
+      })
     }
   }  
 }
@@ -284,12 +294,15 @@ class Automation {
   debug: Boolean
   private _uiUtils: UIUtils
   speed: TestSpeed
+  status: TestPlayStatus
+  currentAction: (() => {}) | undefined
 
   constructor(window: Window) {
     this._document = window.document
     this.debug = true
     this._uiUtils = new UIUtils(window)
     this.speed = TestSpeed.NORMAL
+    this.status = TestPlayStatus.STOPPED
   }
 
   public get document() {
@@ -298,6 +311,33 @@ class Automation {
 
   public get uiUtils() {
     return this._uiUtils
+  }
+
+  public pause() {
+    console.log('Pause Test')
+    this.status = TestPlayStatus.PAUSED
+  }
+
+  public continue() {
+    console.log('Continue Test')
+    this.status = TestPlayStatus.PLAYING
+    if (this.currentAction) {
+      this.currentAction()
+      this.currentAction = undefined
+    }
+  }
+
+  public stop() {
+    console.log('Stop Test')
+    this.status = TestPlayStatus.STOPPED
+    if (this.currentAction) {
+      this.currentAction()
+      this.currentAction = undefined
+    }
+  }
+
+  public saveCurrentAction(callback: () => {}) {
+    this.currentAction = callback
   }
 
   setDebug(value: Boolean) {
@@ -321,6 +361,7 @@ const Setup = (window: Window, tests?: Array<any>) => {
   setDocument(AutomationInstance.document)
 
   tests?.forEach((installerFn) => installerFn())
+  return AutomationInstance
 }
 
 export {
