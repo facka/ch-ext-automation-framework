@@ -195,13 +195,21 @@ class UIUtils {
   }
 
   displayContext(context: any) {
-    updateStyle(this.contextViewerContainer, {display: 'flex'})
+    updateStyle(this.contextViewerContainer, {
+      display: 'flex',
+      'background-color': 'white',
+      'position': 'absolute',
+      'top': '0px',
+      'left': '0px',
+      'z-index': '9999',
+    })
     const contextViewerBefore = this.document.createElement('DIV')
     contextViewerBefore.id = 'context-viewer-before'
     updateStyle(contextViewerBefore, {
       flex: '50%',
       width: '100%',
       height: 'auto',
+      border: '2px solid orange',
     })
     const contextViewerAfter = this.document.createElement('DIV')
     contextViewerAfter.id = 'context-viewer-after'
@@ -209,6 +217,7 @@ class UIUtils {
       flex: '50%',
       width: '100%',
       height: 'auto',
+      border: '2px solid green'
     })
     const beforeHTML = this.document.createElement('DIV')
     beforeHTML.innerHTML = context.beforeHTML
