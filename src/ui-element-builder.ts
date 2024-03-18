@@ -44,7 +44,7 @@ const SelectorBuilder = (query: string, filterFn?: (value: HTMLElement, index: n
     } else {
       elemFound = elementsFound[0]
     }
-    if (postProcess) {
+    if (elemFound && postProcess) {
       console.log('Apply post process to = ', elemFound)
       elemFound = postProcess(elemFound)
     }
@@ -108,6 +108,10 @@ const INPUT = selectorFilter('input')
 
 const TEXTAREA = selectorFilter('textarea')
 
+const identifiedBy = (id: string) => {
+  return selectorFilterResponse(SelectorBuilder('#'+id))
+}
+
 const ELEMENT = (htmlTag: string) => {
   return selectorFilter(htmlTag)
 }
@@ -168,6 +172,7 @@ const is = {
   INPUT,
   TEXTAREA,
   ELEMENT,
+  identifiedBy,
 }
 
 export {

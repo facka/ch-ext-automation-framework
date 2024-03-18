@@ -65,7 +65,7 @@ const waitForElement = async (currentAction: ActionOnElement | WaitUntilElementR
   if (uiElement.parent) {
     try {
       console.groupCollapsed('Look for Parent ', uiElement.parent.getElementName())
-      parentElement = await waitForElement(currentAction, uiElement.parent)
+      parentElement = await waitForElement(currentAction, uiElement.parent, delay, maxTries, untilRemoved)
       console.groupEnd()
     } catch (e: any) {
       console.groupEnd() // Look for parent
@@ -345,7 +345,7 @@ abstract class ActionOnElement extends AbstractAction {
       if (uiElement.parent) {
         console.groupCollapsed('Look for Parent ', uiElement.parent.getElementName())
         try {
-          parentElement = await ActionOnElement.waitForElement(currentAction, uiElement.parent)
+          parentElement = await ActionOnElement.waitForElement(currentAction, uiElement.parent, delay, maxTries, untilRemoved)
         } catch (e) {
           parentSuccess = false
         } finally {
@@ -523,6 +523,18 @@ class AssertNotExistsAction extends ActionOnElement {
 
   constructor (uiElement: UIElement) {
     super(uiElement)
+  }
+
+  async executeAction () {
+    try {
+      this.element = await waitForElement(this, this.uiElement, 1000, 5, true) as HTMLElement
+      this.element?.setAttribute("test-id", this.getElementName());
+      await AutomationInstance.uiUtils.checkElement(this.element, this.getElementName())
+      this.executeActionOnElement()
+      await AutomationInstance.uiUtils.hideCheckElementContainer()
+    } catch (e: any) {
+      throw Error(e.message)
+    }
   }
 
   protected executeActionOnElement () {
