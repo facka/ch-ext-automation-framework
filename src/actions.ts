@@ -1,4 +1,4 @@
-import { AutomationEvents, EVENT_NAMES, AutomationInstance} from "./automation";
+import { AutomationEvents, EVENT_NAMES, AutomationInstance } from "./automation";
 import { UIElement } from "./ui-element-builder";
 import { v4 as uuidv4 } from 'uuid';
 import { wait } from "./ui-utils";
@@ -6,7 +6,7 @@ import { wait } from "./ui-utils";
 const retry = async (currentAction: ActionOnElement | WaitUntilElementRemovedAction, uiElement: UIElement, parentElement: HTMLElement | null, delay = 1000, index = 0, maxTries = 10, untilRemoved = false): Promise<HTMLElement | null > => {
 
   console.log('Automation Status: ', AutomationInstance.status)
-  if (AutomationInstance.status == 'Paused') {
+  if (AutomationInstance.isPaused) {
     return new Promise<HTMLElement | null >((resolve, reject) => {
       AutomationInstance.saveCurrentAction(async () => {
         const response = await retry(currentAction, uiElement, parentElement, delay, index, maxTries, untilRemoved)
@@ -14,7 +14,7 @@ const retry = async (currentAction: ActionOnElement | WaitUntilElementRemovedAct
       })
     })
   }
-  if (AutomationInstance.status == 'Stopped') {
+  if (AutomationInstance.isStopped) {
     throw new Error('Test stopped manually')
   }
   console.groupCollapsed(`tries ${index}/${maxTries}`)
@@ -157,6 +157,9 @@ abstract class AbstractAction {
       await this.executeAction()
       this.status = 'success'
       this.error = ''
+      if ( AutomationInstance.isStepByStepMode) {
+        AutomationInstance.pause()
+      }
     } catch (e: any) {
       this.status = 'error'
       this.error = e.message
@@ -221,7 +224,7 @@ class Action extends AbstractAction {
   }
 
   async continue () {
-    if (AutomationInstance.status == 'Paused') {
+    if (AutomationInstance.isPaused) {
       return new Promise<void>((resolve, reject) => {
         AutomationInstance.saveCurrentAction(async () => {
           await this.continue()
@@ -229,7 +232,7 @@ class Action extends AbstractAction {
         })
       })
     }
-    if (AutomationInstance.status == 'Stopped') {
+    if (AutomationInstance.isStopped) {
       throw new Error('Test stopped manually')
     }
     if (this.index < this.steps.length) {

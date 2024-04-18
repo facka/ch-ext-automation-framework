@@ -106,6 +106,11 @@ enum TestPlayStatus {
   PAUSED = 'Paused'
 }
 
+enum RunMode {
+  NORMAL = 'Normal',
+  STEPBYSTEP = 'Step By Step',
+}
+
 
 class AutomationRunner {
   static running = false
@@ -295,6 +300,7 @@ class Automation {
   private _uiUtils: UIUtils
   speed: TestSpeed
   status: TestPlayStatus
+  runMode: RunMode
   currentAction: (() => {}) | undefined
 
   constructor(window: Window) {
@@ -303,6 +309,7 @@ class Automation {
     this._uiUtils = new UIUtils(window)
     this.speed = TestSpeed.NORMAL
     this.status = TestPlayStatus.STOPPED
+    this.runMode = RunMode.NORMAL
   }
 
   public get document() {
@@ -313,6 +320,23 @@ class Automation {
     return this._uiUtils
   }
 
+  public get isStepByStepMode() {
+    return this.runMode == RunMode.STEPBYSTEP
+  }
+
+  public get isStopped() {
+    return this.status == TestPlayStatus.STOPPED
+  }
+
+  public get isPlaying() {
+    return this.status == TestPlayStatus.PLAYING
+  }
+
+
+  public get isPaused() {
+    return this.status == TestPlayStatus.PAUSED
+  }
+
   public pause() {
     console.log('Pause Test')
     this.status = TestPlayStatus.PAUSED
@@ -321,6 +345,16 @@ class Automation {
   public continue() {
     console.log('Continue Test')
     this.status = TestPlayStatus.PLAYING
+    if (this.currentAction) {
+      this.currentAction()
+      this.currentAction = undefined
+    }
+  }
+
+  public next() {
+    console.log('Continue Test to Next Step...')
+    this.status = TestPlayStatus.PLAYING
+    this.runMode = RunMode.STEPBYSTEP
     if (this.currentAction) {
       this.currentAction()
       this.currentAction = undefined
