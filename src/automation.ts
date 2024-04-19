@@ -170,8 +170,8 @@ const RunTest = (id: string) => {
   }
 }
 
-const Task = (id: string, steps: (params?: any) => void) => {
-  return async (params?: any) => {
+const Task = <T>(id: string, steps: (params: T) => void) => {
+  return async (params?: T): Promise<void> => {
     const action = new Action(id, steps)
     action.setParams(params)
     if (!AutomationRunner.running && !AutomationCompiler.isCompiling) {
