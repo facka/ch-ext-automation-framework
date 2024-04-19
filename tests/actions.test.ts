@@ -1,29 +1,11 @@
-import { AutomationEvents, Click, EVENT_NAMES, Task, Setup, AutomationInstance } from '../src/automation'
-import { innerTextIs, is } from '../src/ui-element-builder'
-import { expect, test } from 'vitest'
+import { AutomationEvents, Click, EVENT_NAMES, Task, Setup, AutomationInstance, Type, Assert } from '../src/automation'
+import { innerTextIs, is, isFirstElement } from '../src/ui-element-builder'
+import { beforeAll, expect, test } from 'vitest'
 import { JSDOM } from 'jsdom'
+import { Action } from '../src/actions'
 
-const UIElements = {
-  button: is.BUTTON.where(innerTextIs('Click me!')).as('Click Me button')
-}
-
-const actions = {
-  clickButtonTest: Task('Click Button Test', () => {
-    Click(UIElements.button)
-  })
-}
-
-test('Test click button', async () => {
-  const { window } = (new JSDOM(`
-    <div>
-      <button>Click me!</button>
-    </div
-  `));
-  await Setup(window)
-
-  actions.clickButtonTest()
-
-  const waitForActionUpadate: any = () => {
+const TestUtils = {
+  waitForActionUpdate: ():Promise<Action> => {
     return new Promise((resolve, reject) => {
       AutomationEvents.on(EVENT_NAMES.ACTION_UPDATE, (data: any) => {
         if (data.action.status === 'success') {
@@ -34,9 +16,49 @@ test('Test click button', async () => {
       })
     })
   }
+}
 
-  const actionData = await waitForActionUpadate()
-  
+const UIElements = {
+  button: is.BUTTON.where(innerTextIs('Click me!')).as('Click Me button'),
+  input: is.INPUT.where(isFirstElement()).as('Input field')
+}
+
+const actions = {
+  clickButtonTest: Task('Click Button Test', () => {
+    Click(UIElements.button)
+  }),
+  typeInInput: Task('Type in Input', (params: {
+    value: string
+  }
+  ) => {
+    const { value } = params
+    Type(value).in(UIElements.input)
+    Assert(UIElements.input).valueIs(value)
+  })
+}
+
+beforeAll(async () => {
+  const { window } = (new JSDOM(`
+    <div>
+      <button>Click me!</button>
+    </div>
+    <div>
+      <input type="text"/>
+    </div>
+  `));
+  Event = window.Event
+  await Setup(window)
+})
+
+test('Test click button', async () => {
+  actions.clickButtonTest()
+  const actionData = await TestUtils.waitForActionUpdate()
+  expect(actionData.status).toBe('success')
+})
+
+test('Test type in input with parameterized Task', async () => {
+  actions.typeInInput({ value: 'Some value' })
+  const actionData = await TestUtils.waitForActionUpdate()
   expect(actionData.status).toBe('success')
 })
 
