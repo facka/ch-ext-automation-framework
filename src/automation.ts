@@ -118,6 +118,7 @@ class AutomationRunner {
   static async start (startAction: Action) {
     AutomationRunner.running = true
     AutomationInstance.status = TestPlayStatus.PLAYING
+    AutomationInstance.runMode = RunMode.NORMAL
     console.groupCollapsed('Start Action: ', startAction.getDescription())
     AutomationEvents.dispatch(EVENT_NAMES.START, {
       action: startAction?.getJSON(),
@@ -176,12 +177,17 @@ const Task = <T>(id: string, steps: (params: T) => void) => {
     action.setParams(params)
     if (!AutomationRunner.running && !AutomationCompiler.isCompiling) {
       try {
+        console.log(`Compilation of Task ${id} starts...`)
         AutomationCompiler.init(action)
+        console.log(`Compilation of Task ${id} Finished.`)
+        console.log(`Start running Task ${id}...`)
         await AutomationRunner.start(action)
+        console.log(`End of Task ${id}: SUCCESS`)
       } catch (e: any) {
         console.log('Error running task ' + id + '. ' + e.message)
       }
     } else {
+      console.log(`Adding action ${id} to compilation stack`)
       AutomationCompiler.addAction(action)
       AutomationCompiler.compileAction(action)
     }
@@ -345,6 +351,7 @@ class Automation {
   public continue() {
     console.log('Continue Test')
     this.status = TestPlayStatus.PLAYING
+    this.runMode = RunMode.NORMAL
     if (this.currentAction) {
       this.currentAction()
       this.currentAction = undefined
