@@ -868,6 +868,32 @@ class WaitUntilElementRemovedAction extends AbstractAction {
   }
 }
 
+class PauseAction extends AbstractAction {
+
+  constructor () {
+    super()
+  }
+
+  getDescription () {
+    return 'Paused'
+  }
+
+  getJSON () {
+    return {
+      ...super.getJSON(),
+      type: 'Pause',
+    }
+  }
+
+  async executeAction () {
+    await AutomationInstance.pause()
+  }
+
+  resetAction () {
+    // nothing to do
+  }
+}
+
 export {
   AbstractAction,
   Action,
@@ -887,4 +913,5 @@ export {
   SaveValueAction,
   WaitAction,
   WaitUntilElementRemovedAction,
+  PauseAction,
 }

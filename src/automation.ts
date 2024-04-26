@@ -17,6 +17,7 @@ import {
   SaveValueAction,
   WaitAction,
   WaitUntilElementRemovedAction,
+  PauseAction,
 } from './actions'
 import { UIUtils } from "./ui-utils"
 import { UIElement, setDocument } from './ui-element-builder'
@@ -300,6 +301,10 @@ Wait.untilElement = (uiElement: UIElement) => {
   }
 }
 
+const Pause = () => {
+  AutomationCompiler.addAction(new PauseAction())
+}
+
 class Automation {
   private _document: Document
   debug: Boolean
@@ -422,6 +427,7 @@ export {
   PressTabKey,
   SaveValue,
   Wait,
+  Pause,
   DateUtils,
   AutomationEvents,
   EVENT_NAMES,
