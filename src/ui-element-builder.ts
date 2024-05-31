@@ -39,8 +39,13 @@ const SelectorBuilder = (query: string, filterFn?: (value: HTMLElement, index: n
     let elemFound
     if (filterFn) {
       console.log('Applying filter ', filterFn)
-      console.log('  -- to ' + elementsFound.length + 'elements')
-      elemFound = elementsFound.filter(filterFn)[0]
+      console.log('  -- to ' + elementsFound.length + 'elements: ', elementsFound)
+      elemFound = elementsFound.filter((elem: HTMLElement, index: number, array: HTMLElement[]) => {
+        console.log('Apply filter to item ' + index + ': ', elem)
+        const match = filterFn(elem, index, array)
+        console.log(`  -> Item ${index} ${ match ? 'Match' : 'Discarded'}`)
+        return match
+      })[0]
     } else {
       elemFound = elementsFound[0]
     }

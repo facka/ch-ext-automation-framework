@@ -894,6 +894,44 @@ class PauseAction extends AbstractAction {
   }
 }
 
+class ManualAction extends AbstractAction {
+  description: string
+
+  constructor (description: string) {
+    super()
+    this.description = description
+  }
+
+  getDescription () {
+    return 'Manual Step: ' + this.description
+  }
+
+  getJSON () {
+    return {
+      ...super.getJSON(),
+      type: 'ManualStep',
+    }
+  }
+
+  async executeAction () {
+    await AutomationInstance.uiUtils.showAlert('Waiting manual step...')
+    return new Promise((resolve, reject) => {
+      AutomationEvents.on(EVENT_NAMES.USER_ACCEPT, async () => {
+        await AutomationInstance.uiUtils.hideAlert()
+        return resolve(true)
+      })
+      AutomationEvents.on(EVENT_NAMES.USER_REJECT, async () => {
+        await AutomationInstance.uiUtils.hideAlert()
+        return reject()
+      })
+    })
+  }
+  
+  resetAction () {
+    // nothing to do
+  }
+}
+
 export {
   AbstractAction,
   Action,
@@ -914,4 +952,5 @@ export {
   WaitAction,
   WaitUntilElementRemovedAction,
   PauseAction,
+  ManualAction,
 }

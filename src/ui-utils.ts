@@ -38,6 +38,7 @@ class UIUtils {
   darkLayerBottom: HTMLElement
   currentCheckElem: HTMLElement
   contextViewerContainer: HTMLElement
+  devToolsAlertContainer: HTMLElement
 
   constructor (window: Window) {
     this.document = window.document
@@ -53,6 +54,25 @@ class UIUtils {
         right: '10px',
         fontFamily: 'monospace',
         zIndex: '9999',
+      },
+      parent: this.document.body
+    })
+
+    this.devToolsAlertContainer = this.createElement('DIV', {
+      id: 'dev-tools-alert-container',
+      styles: {
+        width: '100%',
+        height: '30px',
+        backgroundColor: '#b00',
+        color: 'white',
+        position: 'absolute ',
+        top: 0,
+        fontFamily: 'monospace',
+        zIndex: '9999',
+        display: 'none',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '5px',
       },
       parent: this.document.body
     })
@@ -186,6 +206,32 @@ class UIUtils {
     this.devToolsCheckElementContainer.style.display = 'block'
     this.devToolsCheckElementContainer.style.opacity = '1'
     await wait(200)
+  }
+
+  async showAlert (message: string) {
+    const messageElem = AutomationInstance.document.createElement('DIV')
+    const body = AutomationInstance.document.body
+    messageElem.innerText = message
+    updateStyle(body, {
+      paddingTop: '30px',
+    })
+    updateStyle(this.devToolsAlertContainer, {
+      display: 'flex',
+    })
+    this.devToolsAlertContainer.appendChild(messageElem)
+  }
+
+  async hideAlert () {
+    updateStyle(this.devToolsAlertContainer, {
+      display: 'none',
+    })
+    const body = AutomationInstance.document.body
+    updateStyle(body, {
+      paddingTop: '0',
+    })
+    if (this.devToolsAlertContainer.firstChild) {
+      this.devToolsAlertContainer.removeChild(this.devToolsAlertContainer.firstChild)
+    }
   }
 
   async hideCheckElementContainer () {

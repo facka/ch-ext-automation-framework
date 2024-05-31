@@ -18,6 +18,7 @@ import {
   WaitAction,
   WaitUntilElementRemovedAction,
   PauseAction,
+  ManualAction,
 } from './actions'
 import { UIUtils } from "./ui-utils"
 import { UIElement, setDocument } from './ui-element-builder'
@@ -58,7 +59,9 @@ enum EVENT_NAMES {
   TEST_STARTED = 'test-started',
   TEST_PASSED = 'test-passed',
   TEST_FAILED = 'test-failed',
-  TEST_END = 'test-end'
+  TEST_END = 'test-end',
+  USER_ACCEPT = 'user-accept',
+  USER_REJECT = 'user-reject'
 }
 
 type AutomationEventHandlerType = ((action?: any) => void)
@@ -305,6 +308,10 @@ const Pause = () => {
   AutomationCompiler.addAction(new PauseAction())
 }
 
+const ManualTask = (description: string) => {
+  AutomationCompiler.addAction(new ManualAction(description))
+}
+
 class Automation {
   private _document: Document
   debug: Boolean
@@ -428,6 +435,7 @@ export {
   SaveValue,
   Wait,
   Pause,
+  ManualTask,
   DateUtils,
   AutomationEvents,
   EVENT_NAMES,
