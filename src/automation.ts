@@ -14,6 +14,7 @@ import {
   PressEscKeyAction,
   PressDownKeyAction,
   PressTabKeyAction,
+  UploadFileAction,
   SaveValueAction,
   WaitAction,
   WaitUntilElementRemovedAction,
@@ -283,6 +284,15 @@ const TypePassword = (value: string) => {
   }
 }
 
+const UploadFile = (file: File) => {
+  return {
+    in: (uiElement: UIElement) => {
+      const action = new UploadFileAction(uiElement, file)
+      AutomationCompiler.addAction(action)
+    }
+  }
+}
+
 const SaveValue = (uiElement: UIElement) => {
   return {
     in: (memorySlotName: string) => {
@@ -432,6 +442,7 @@ export {
   PressEscKey,
   PressDownKey,
   PressTabKey,
+  UploadFile,
   SaveValue,
   Wait,
   Pause,

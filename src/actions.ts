@@ -58,7 +58,7 @@ const retry = async (currentAction: ActionOnElement | WaitUntilElementRemovedAct
    * @param delay of each try. Defaults to 1 second
    */
 const waitForElement = async (currentAction: ActionOnElement | WaitUntilElementRemovedAction, uiElement: UIElement, delay: number = 1000, maxTries = 10, untilRemoved = false): Promise<HTMLElement | null > => {
-  const elementName = uiElement.getElementName()
+  const elementName = uiElement?.getElementName()
   console.group('Looking for Element: ' + elementName);
 
   let parentElement: HTMLElement | null = null
@@ -276,7 +276,7 @@ abstract class ActionOnElement extends AbstractAction {
   }
 
   getElementName () {
-    return this.uiElement.getElementName()
+    return this.uiElement?.getElementName()
   }
 
   updateTries (tries: number) {
@@ -601,7 +601,7 @@ class TypeAction extends ActionOnElement {
   }
 
   protected executeActionOnElement () {
-    let inputElem = this.element as HTMLInputElement
+    let inputElem = this.element as HTMLInputElement | HTMLTextAreaElement
     if (this.element?.tagName !== 'INPUT' && this.element?.tagName !== 'SELECT' && this.element?.tagName !== 'TEXTAREA') {
       inputElem = this.element?.querySelectorAll('input')[0] as HTMLInputElement
       if (!inputElem) {
@@ -767,6 +767,60 @@ class PressTabKeyAction extends ActionOnElement {
   }
 }
 
+class UploadFileAction extends ActionOnElement {
+  file: File
+
+  constructor (uiElement: UIElement, file: File) {
+    super(uiElement)
+    this.file = file
+  }
+
+  protected executeActionOnElement(): void {
+    const fileInput = this.element as HTMLInputElement
+
+    
+    // Create a data transfer object. Similar to what you get from a `drop` event as `event.dataTransfer`
+    const dataTransfer = new DataTransfer();
+    
+    // Add your file to the file list of the object
+    dataTransfer.items.add(this.file);
+    
+    // Save the file list to a new variable
+    const fileList = dataTransfer.files;
+    
+    // Set your input `files` to the file list
+    fileInput.files = fileList;
+    fileInput.dispatchEvent(new Event('change'));
+
+    function getParentForm (elem: HTMLElement): HTMLFormElement | null {
+      if (elem?.parentElement) {
+        if (elem.parentElement?.tagName.toLowerCase() === 'form') {
+          return elem.parentElement as HTMLFormElement
+        } else {
+          return getParentForm(elem.parentElement)
+        }
+      } else {
+        return null
+      }
+    }
+    const form = getParentForm(fileInput)
+    if (form) {
+      form.dispatchEvent(new Event('change'))
+    }
+  }
+
+  getDescription () {
+    return `Upload file in ${this.getElementName()}`
+  }
+
+  getJSON () {
+    return {
+      ...super.getJSON(),
+      type: 'UploadFile',
+    }
+  }
+}
+
 class SaveValueAction extends ActionOnElement {
   memorySlotName: string
 
@@ -849,7 +903,7 @@ class WaitUntilElementRemovedAction extends AbstractAction {
   }
 
   getElementName () {
-    return this.uiElement.getElementName()
+    return this.uiElement?.getElementName()
   }
 
   protected async executeAction () {
@@ -943,6 +997,7 @@ export {
   PressEscKeyAction,
   PressDownKeyAction,
   PressTabKeyAction,
+  UploadFileAction,
   AssertTextIsAction,
   AssertContainsTextAction,
   AssertValueIsAction,
