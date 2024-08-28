@@ -3,6 +3,8 @@ import { UIElement } from "./ui-element-builder";
 import { v4 as uuidv4 } from 'uuid';
 import { wait } from "./ui-utils";
 
+const HTML_ELEMENT_REMOVED = null
+
 const retry = async (currentAction: ActionOnElement | WaitUntilElementRemovedAction, uiElement: UIElement, parentElement: HTMLElement | null, delay = 1000, index = 0, maxTries = 10, untilRemoved = false): Promise<HTMLElement | null > => {
 
   console.log('Automation Status: ', AutomationInstance.status)
@@ -43,7 +45,7 @@ const retry = async (currentAction: ActionOnElement | WaitUntilElementRemovedAct
     } else {
       if (untilRemoved) {
         console.log('Element removed.')
-        return null
+        return HTML_ELEMENT_REMOVED
       } else {
         await wait(delay)
         return await retry(currentAction, uiElement, parentElement, delay, ++index, maxTries, untilRemoved)
@@ -69,8 +71,14 @@ const waitForElement = async (currentAction: ActionOnElement | WaitUntilElementR
       console.groupEnd()
     } catch (e: any) {
       console.groupEnd() // Look for parent
-      console.groupEnd() // Look for element
-      throw e
+      if (untilRemoved && e.message.includes('not found')) {
+        console.log('Parent not found, so element was removed')
+        console.groupEnd() // Look for element
+        return HTML_ELEMENT_REMOVED // Parent was removed so it's ok to return success
+      } else {
+        console.groupEnd() // Look for element
+        throw e
+      }
     }    
   }
   try {
@@ -79,8 +87,14 @@ const waitForElement = async (currentAction: ActionOnElement | WaitUntilElementR
     console.groupEnd()
     return elem
   } catch (e: any) {
-    console.groupEnd()
-    throw e
+    if (untilRemoved && e.message.includes('not found')) {
+      console.log('Parent not found, so element was removed')
+      console.groupEnd() // Look for element
+      return HTML_ELEMENT_REMOVED // Parent was removed so it's ok to return success
+    } else {
+      console.groupEnd() // Look for element
+      throw e
+    }
   }
 }
 
