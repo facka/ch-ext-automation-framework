@@ -37,6 +37,7 @@ import {
   AutomationInstance,
   EVENT_NAMES,
   TestSpeed,
+  ACTION_STATUS,
 } from './automation';
 
 import {
@@ -80,4 +81,5 @@ export {
   EVENT_NAMES,
   TestSpeed,
   wait,
+  ACTION_STATUS,
 };

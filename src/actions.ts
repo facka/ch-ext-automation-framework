@@ -10,10 +10,17 @@ const retry = async (currentAction: ActionOnElement | WaitUntilElementRemovedAct
   console.log('Automation Status: ', AutomationInstance.status)
   if (AutomationInstance.isPaused) {
     return new Promise<HTMLElement | null >((resolve, reject) => {
-      AutomationInstance.saveCurrentAction(async () => {
-        const response = await retry(currentAction, uiElement, parentElement, delay, index, maxTries, untilRemoved)
-        resolve(response)
-      })
+      AutomationInstance.saveCurrentAction(async (action: AbstractAction) => {
+        if (action.status == ACTION_STATUS.SKIPPED) {
+          return resolve(null)
+        }
+        try {
+          const response = await retry(action as ActionOnElement | WaitUntilElementRemovedAction, uiElement, parentElement, delay, index, maxTries, untilRemoved)
+          resolve(response)
+        } catch (error: any) {
+          reject(error)
+        }
+      }, currentAction)
     })
   }
   if (AutomationInstance.isStopped) {
@@ -108,14 +115,24 @@ interface ActionContext {
   endTimestamp: string
 }
 
+enum ACTION_STATUS {
+  WAITING = 'waiting',
+  RUNNING = 'running',
+  STOPPED = 'stopped',
+  PAUSED = 'paused',
+  SUCCESS = 'success',
+  ERROR = 'error',
+  SKIPPED = 'skipped',
+}
+
 abstract class AbstractAction {
-  status: string
+  status: ACTION_STATUS
   error: string
   id: string
   context: ActionContext
 
   constructor () {
-    this.status = 'waiting'
+    this.status = ACTION_STATUS.WAITING
     this.error = ''
     this.id = uuidv4()
     this.context = {
@@ -145,7 +162,7 @@ abstract class AbstractAction {
   protected abstract resetAction() : void
 
   reset () {
-    this.status = 'waiting'
+    this.status = ACTION_STATUS.WAITING
     this.error = ''
     this.resetAction()
   }
@@ -163,21 +180,26 @@ abstract class AbstractAction {
 
   async execute () {
     try {
-      this.status = 'running'
+      this.status = ACTION_STATUS.RUNNING
       this.context.beforeInputValues = this.getInputValuesFromPage()
       this.context.beforeHTML = AutomationInstance.document.body.innerHTML
       await AbstractAction.notifyActionUpdated(this)
       console.log('Action: ', this.getDescription())
       await this.executeAction()
-      this.status = 'success'
+      this.status = ACTION_STATUS.SUCCESS
       this.error = ''
       if ( AutomationInstance.isStepByStepMode) {
         AutomationInstance.pause()
       }
     } catch (e: any) {
-      this.status = 'error'
+      this.status = ACTION_STATUS.ERROR
       this.error = e.message
-      throw Error('Error in Action ' + this.getDescription() + '. Message: ' + e.message)
+      if (e.message == 'Test stopped manually') {
+        throw Error('Error in Action ' + this.getDescription() + '. Message: ' + e.message)
+      } else {
+        this.status = ACTION_STATUS.PAUSED
+        AutomationInstance.pause()
+      }
     } finally {
       this.context.afterInputValues = this.getInputValuesFromPage()
       this.context.afterHTML = AutomationInstance.document.body.innerHTML
@@ -240,22 +262,48 @@ class Action extends AbstractAction {
   async continue () {
     if (AutomationInstance.isPaused) {
       return new Promise<void>((resolve, reject) => {
-        AutomationInstance.saveCurrentAction(async () => {
-          await this.continue()
-          resolve()
-        })
+        AutomationInstance.saveCurrentAction(async (action: AbstractAction) => {
+          if (action.status == ACTION_STATUS.SKIPPED) {
+            return resolve()
+          }
+          try {
+            await (action as Action).continue()
+            resolve()
+          } catch (error: any) {
+            reject(error)
+          }
+        }, this)
       })
     }
     if (AutomationInstance.isStopped) {
       throw new Error('Test stopped manually')
     }
     if (this.index < this.steps.length) {
-      const action = this.steps[this.index]
+      const step = this.steps[this.index]
       try {
         await wait(AutomationInstance.speed)
-        await action.execute()
-        this.index++
-        await this.continue()
+        await step.execute()
+        if (!AutomationInstance.isPaused) {
+          this.index++
+          await this.continue()
+        } else {
+          return new Promise<void>((resolve, reject) => {
+            AutomationInstance.saveCurrentAction(async (action: AbstractAction) => {
+              if (action.status == ACTION_STATUS.SKIPPED) {
+                this.index++
+                await AbstractAction.notifyActionUpdated(step)
+                await this.continue()
+                return resolve()
+              }
+              try {
+                await (action as Action).continue()
+                resolve()
+              } catch (error: any) {
+                reject(error)
+              }
+            }, step)
+          })
+        }
       } catch (e) {
         throw e
       }
@@ -295,6 +343,10 @@ abstract class ActionOnElement extends AbstractAction {
 
   updateTries (tries: number) {
     this.tries = tries
+  }
+
+  resetTries () {
+    this.tries = 0
   }
 
   getJSON () {
@@ -400,7 +452,7 @@ abstract class ActionOnElement extends AbstractAction {
 
   resetAction () {
     this.element = null
-    this.tries = 0
+    this.resetTries()
   }
 
 }
@@ -1022,4 +1074,5 @@ export {
   WaitUntilElementRemovedAction,
   PauseAction,
   ManualAction,
+  ACTION_STATUS,
 }

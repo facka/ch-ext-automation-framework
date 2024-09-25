@@ -20,6 +20,7 @@ import {
   WaitUntilElementRemovedAction,
   PauseAction,
   ManualAction,
+  ACTION_STATUS,
 } from './actions'
 import { UIUtils } from "./ui-utils"
 import { UIElement, setDocument } from './ui-element-builder'
@@ -329,7 +330,8 @@ class Automation {
   speed: TestSpeed
   status: TestPlayStatus
   runMode: RunMode
-  currentAction: (() => {}) | undefined
+  currentActionCallback: ((action: AbstractAction) => {}) | undefined
+  currentAction: AbstractAction | undefined
 
   constructor(window: Window) {
     this._document = window.document
@@ -374,9 +376,9 @@ class Automation {
     console.log('Continue Test')
     this.status = TestPlayStatus.PLAYING
     this.runMode = RunMode.NORMAL
-    if (this.currentAction) {
-      this.currentAction()
-      this.currentAction = undefined
+    if (this.currentActionCallback && this.currentAction) {
+      this.currentActionCallback(this.currentAction)
+      this.currentActionCallback = undefined
     }
   }
 
@@ -384,23 +386,47 @@ class Automation {
     console.log('Continue Test to Next Step...')
     this.status = TestPlayStatus.PLAYING
     this.runMode = RunMode.STEPBYSTEP
-    if (this.currentAction) {
-      this.currentAction()
-      this.currentAction = undefined
+    if (this.currentActionCallback && this.currentAction) {
+      this.currentActionCallback(this.currentAction)
+      this.currentActionCallback = undefined
     }
   }
 
   public stop() {
     console.log('Stop Test')
     this.status = TestPlayStatus.STOPPED
-    if (this.currentAction) {
-      this.currentAction()
-      this.currentAction = undefined
+    if (this.currentActionCallback && this.currentAction) {
+      this.currentActionCallback(this.currentAction)
+      this.currentActionCallback = undefined
     }
   }
 
-  public saveCurrentAction(callback: () => {}) {
-    this.currentAction = callback
+  public retryAction() {
+    console.log('Retry current step')
+    this.status = TestPlayStatus.PLAYING
+    if (this.currentActionCallback && this.currentAction) {
+      if ((this.currentAction as ActionOnElement).resetTries) {
+        (this.currentAction as ActionOnElement).resetTries()
+      }
+      this.currentActionCallback(this.currentAction)
+      this.currentActionCallback = undefined
+    }
+  }
+
+  public skipAction() {
+    console.log('Skip current step')
+    this.status = TestPlayStatus.PLAYING
+    if (this.currentActionCallback && this.currentAction) {
+      this.currentAction.status = ACTION_STATUS.SKIPPED
+      AbstractAction.notifyActionUpdated(this.currentAction) // Not working
+      this.currentActionCallback(this.currentAction)
+      this.currentActionCallback = undefined
+    }
+  }
+
+  public saveCurrentAction(callback: (action: AbstractAction) => {}, action: AbstractAction) {
+    this.currentActionCallback = callback
+    this.currentAction = action
   }
 
   setDebug(value: Boolean) {
@@ -451,4 +477,5 @@ export {
   AutomationEvents,
   EVENT_NAMES,
   TestSpeed,
+  ACTION_STATUS,
 }
