@@ -447,6 +447,10 @@ onBeforeUnmount(() => {
 .error-text {
   color: var(--error);
   font-size: 11px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .ctx-source {

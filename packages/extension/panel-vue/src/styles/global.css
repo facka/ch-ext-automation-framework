@@ -614,7 +614,7 @@ h3 {
   line-height: 1.5;
   white-space: nowrap;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
 }
 
