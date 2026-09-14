@@ -31,6 +31,30 @@ var flattenSpec = require('../src/flattener').flattenSpec;
 var validateSpec = require('../src/validator').validateSpec;
 var emitSpec = require('../src/emitter').emitSpec;
 
+var ANSI = {
+  reset: '\x1b[0m',
+  red: '\x1b[31m',
+  yellow: '\x1b[33m',
+  green: '\x1b[32m',
+};
+
+function colorize(text, color, stream) {
+  if (process.env.NO_COLOR || !stream.isTTY) return text;
+  return color + text + ANSI.reset;
+}
+
+function errorText(text) {
+  return colorize(text, ANSI.red, process.stderr);
+}
+
+function warningText(text) {
+  return colorize(text, ANSI.yellow, process.stderr);
+}
+
+function successText(text) {
+  return colorize(text, ANSI.green, process.stdout);
+}
+
 // ---------------------------------------------------------------------------
 // Usage
 // ---------------------------------------------------------------------------
@@ -443,7 +467,7 @@ function runPipeline(cwd, options) {
 
   // Print warnings to stderr (non-fatal)
   for (var w = 0; w < allWarnings.length; w++) {
-    console.warn('⚠ ' + allWarnings[w].message);
+    console.warn(warningText('⚠ ' + allWarnings[w].message));
   }
 
   return { ok: true, spec: validationResult.spec, files: files };
@@ -510,10 +534,10 @@ function copyDirRecursive(src, dest) {
       copyDirRecursive(srcPath, destPath);
     } else {
       if (fs.existsSync(destPath)) {
-        console.warn('  ⚠ Skipping ' + path.relative(dest, destPath) + ' (already exists)');
+        console.warn(warningText('  ⚠ Skipping ' + path.relative(dest, destPath) + ' (already exists)'));
       } else {
         fs.writeFileSync(destPath, fs.readFileSync(srcPath, 'utf8'), 'utf8');
-        console.log('  ✓ ' + entry);
+        console.log(successText('  ✓ ' + entry));
       }
     }
   }
@@ -528,14 +552,14 @@ function runInit(cwd) {
 
   // Check if directory already has a tomation.config
   if (fs.existsSync(path.join(cwd, 'tomation.config.ts')) || fs.existsSync(path.join(cwd, 'tomation.config.js'))) {
-    console.error('Error: A tomation.config already exists in this directory.');
+    console.error(errorText('Error: A tomation.config already exists in this directory.'));
     process.exit(1);
   }
 
   // Locate the templates/starter directory relative to this CLI script
   var templateDir = path.join(__dirname, '..', 'templates', 'starter');
   if (!fs.existsSync(templateDir)) {
-    console.error('Error: Template directory not found at ' + templateDir);
+    console.error(errorText('Error: Template directory not found at ' + templateDir));
     process.exit(1);
   }
 
@@ -560,9 +584,9 @@ function runInit(cwd) {
       }
     }, null, 2) + '\n';
     fs.writeFileSync(pkgPath, pkg, 'utf8');
-    console.log('  ✓ package.json');
+    console.log(successText('  ✓ package.json'));
   } else {
-    console.warn('  ⚠ Skipping package.json (already exists)');
+    console.warn(warningText('  ⚠ Skipping package.json (already exists)'));
   }
 
   console.log('');
@@ -581,7 +605,7 @@ function runInit(cwd) {
 function runCompile(cwd, options) {
   var result = runPipeline(cwd, options);
   if (!result.ok) {
-    console.error(result.error);
+    console.error(errorText(result.error));
     process.exit(1);
   }
 
@@ -589,11 +613,11 @@ function runCompile(cwd, options) {
   var outputPath = path.join(cwd, outputFilename);
   var emitResult = emitSpec(result.spec, outputPath);
   if (!emitResult.ok) {
-    console.error(emitResult.error);
+    console.error(errorText(emitResult.error));
     process.exit(1);
   }
 
-  console.log('✓ ' + outputFilename + ' written to ' + emitResult.outputPath);
+  console.log(successText('✓ ' + outputFilename + ' written to ' + emitResult.outputPath));
   process.exit(0);
 }
 
@@ -604,11 +628,11 @@ function runCompile(cwd, options) {
 function runCheck(cwd, options) {
   var result = runPipeline(cwd, options);
   if (!result.ok) {
-    console.error(result.error);
+    console.error(errorText(result.error));
     process.exit(1);
   }
 
-  console.log('✓ spec is valid');
+  console.log(successText('✓ spec is valid'));
   process.exit(0);
 }
 
@@ -622,7 +646,7 @@ function runWatch(cwd, options) {
   // Initial compile
   var result = runPipeline(cwd, options);
   if (!result.ok) {
-    console.error(result.error);
+    console.error(errorText(result.error));
     // Don't exit — keep watching so the user can fix the error
     console.log('[watch] Initial build failed. Watching for changes...');
     watchFiles(cwd, [], liveReloadServer);
@@ -633,14 +657,14 @@ function runWatch(cwd, options) {
   var outputPath = path.join(cwd, outputFilename);
   var emitResult = emitSpec(result.spec, outputPath);
   if (!emitResult.ok) {
-    console.error(emitResult.error);
+    console.error(errorText(emitResult.error));
     console.log('[watch] Initial build failed. Watching for changes...');
     watchFiles(cwd, result.files, liveReloadServer);
     return;
   }
 
   liveReloadServer.update(result.spec);
-  console.log('✓ ' + outputFilename + ' written to ' + emitResult.outputPath);
+  console.log(successText('✓ ' + outputFilename + ' written to ' + emitResult.outputPath));
   console.log('[watch] Watching ' + result.files.length + ' files...');
   watchFiles(cwd, result.files, liveReloadServer);
 }
@@ -675,7 +699,7 @@ function startLiveReloadServer(port) {
   });
 
   server.on('error', function (err) {
-    console.error('[watch] Live reload server error: ' + err.message);
+    console.error(errorText('[watch] Live reload server error: ' + err.message));
   });
 
   server.listen(port, function () {
@@ -719,7 +743,7 @@ function watchFiles(cwd, files, liveReloadServer) {
 
       var pipelineResult = runPipeline(cwd, options);
       if (!pipelineResult.ok) {
-        console.error('[watch] Rebuild failed: ' + pipelineResult.error);
+        console.error(errorText('[watch] Rebuild failed: ' + pipelineResult.error));
         // Re-watch the same files (or new ones if resolve succeeded partially)
         startWatchers(pipelineResult.files || files);
         return;
@@ -729,7 +753,7 @@ function watchFiles(cwd, files, liveReloadServer) {
       var outputPath = path.join(cwd, outputFilename);
       var emitResult = emitSpec(pipelineResult.spec, outputPath);
       if (!emitResult.ok) {
-        console.error('[watch] Rebuild failed: ' + emitResult.error);
+        console.error(errorText('[watch] Rebuild failed: ' + emitResult.error));
         startWatchers(pipelineResult.files);
         return;
       }
@@ -751,11 +775,11 @@ function watchFiles(cwd, files, liveReloadServer) {
             rebuild(filePath);
           });
           watcher.on('error', function (err) {
-            console.warn('[watch] Warning: could not watch ' + filePath + ': ' + err.message);
+            console.warn(warningText('[watch] Warning: could not watch ' + filePath + ': ' + err.message));
           });
           watchers.push(watcher);
         } catch (e) {
-          console.warn('[watch] Warning: could not watch ' + filePath + ': ' + e.message);
+          console.warn(warningText('[watch] Warning: could not watch ' + filePath + ': ' + e.message));
         }
       })(fileList[wi]);
     }
@@ -779,7 +803,7 @@ var options = { verbose: verbose, port: Number.isFinite(parsedPort) && parsedPor
 console.error('[tomation] compiler v' + compilerVersion);
 
 if (!subcommand || subcommand === '--verbose') {
-  console.error('Error: no command provided.\n');
+  console.error(errorText('Error: no command provided.\n'));
   console.error(USAGE);
   process.exit(1);
 }
@@ -798,7 +822,7 @@ switch (subcommand) {
     runWatch(cwd, options);
     break;
   default:
-    console.error('Error: unrecognized command "' + subcommand + '".\n');
+    console.error(errorText('Error: unrecognized command "' + subcommand + '".\n'));
     console.error(USAGE);
     process.exit(1);
 }
