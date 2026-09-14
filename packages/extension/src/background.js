@@ -459,13 +459,20 @@ function evaluateCondition(condition, params, contextStore) {
  */
 function flattenSteps(testSteps, tasksMap, pageElements, checkedIndexes, initialParams) {
   var checked;
+  var checkedPaths = null;
   if (checkedIndexes && typeof checkedIndexes.has === 'function') {
     checked = checkedIndexes;
   } else if (Array.isArray(checkedIndexes)) {
     checked = {};
+    checkedPaths = {};
     for (var ci = 0; ci < checkedIndexes.length; ci++) {
-      checked[checkedIndexes[ci]] = true;
+      if (typeof checkedIndexes[ci] === 'string') {
+        checkedPaths[checkedIndexes[ci]] = true;
+      } else {
+        checked[checkedIndexes[ci]] = true;
+      }
     }
+    if (Object.keys(checkedPaths).length === 0) checkedPaths = null;
     checked.has = function (idx) { return this[idx] === true; };
   } else {
     // If no checked set provided, include all steps
@@ -476,18 +483,28 @@ function flattenSteps(testSteps, tasksMap, pageElements, checkedIndexes, initial
   var result = [];
 
   for (var i = 0; i < testSteps.length; i++) {
-    if (!checked.has(i)) {
+    if (!checked.has(i) && !(checkedPaths && hasSelectedPath(checkedPaths, String(i)))) {
       continue;
     }
 
     var step = testSteps[i];
-    var expanded = expandStep(step, tasksMap, pageElements, params, []);
+    var expanded = expandStep(step, tasksMap, pageElements, params, [], checkedPaths, String(i));
     for (var j = 0; j < expanded.length; j++) {
       result.push(expanded[j]);
     }
   }
 
   return result;
+}
+
+function hasSelectedPath(checkedPaths, path) {
+  if (!checkedPaths || checkedPaths[path]) return true;
+  var prefix = path + '.';
+  var keys = Object.keys(checkedPaths);
+  for (var i = 0; i < keys.length; i++) {
+    if (keys[i].indexOf(prefix) === 0) return true;
+  }
+  return false;
 }
 
 /**
@@ -501,11 +518,11 @@ function flattenSteps(testSteps, tasksMap, pageElements, checkedIndexes, initial
  * @param {object} params - Current parameter context for template resolution
  * @returns {Array} - Array of resolved step message objects
  */
-function expandStep(step, tasksMap, pageElements, params, taskPath) {
+function expandStep(step, tasksMap, pageElements, params, taskPath, checkedPaths, sourcePath) {
   taskPath = taskPath || [];
 
   if (step.action === 'task') {
-    return expandTaskStep(step, tasksMap, pageElements, params, taskPath);
+    return expandTaskStep(step, tasksMap, pageElements, params, taskPath, checkedPaths, sourcePath);
   }
 
   if (step.action === 'if') {
@@ -515,7 +532,8 @@ function expandStep(step, tasksMap, pageElements, params, taskPath) {
       return [{
         action: 'ctxIf', condition: step.condition, then: step.then,
         _tasksMap: tasksMap, _pageElements: pageElements, _params: params,
-        _taskPath: taskPath, _condDepth: 0
+        _taskPath: taskPath, _condDepth: 0,
+        _checkedPaths: checkedPaths, _sourcePath: sourcePath
       }];
     }
     // Param-based conditions are resolved now. Emit a visible "condition" marker
@@ -527,7 +545,9 @@ function expandStep(step, tasksMap, pageElements, params, taskPath) {
     var result = [{ action: 'condition', condition: step.condition, taken: conditionMet, _taskPath: taskPath, _condDepth: 0 }];
     if (conditionMet) {
       for (var i = 0; i < step.then.length; i++) {
-        var expanded = expandStep(step.then[i], tasksMap, pageElements, params, taskPath);
+        var childPath = sourcePath + '.' + i;
+        if (checkedPaths && !hasSelectedPath(checkedPaths, childPath)) continue;
+        var expanded = expandStep(step.then[i], tasksMap, pageElements, params, taskPath, checkedPaths, childPath);
         for (var j = 0; j < expanded.length; j++) {
           var child = expanded[j];
           child._condDepth = (child._condDepth || 0) + 1;
@@ -542,9 +562,11 @@ function expandStep(step, tasksMap, pageElements, params, taskPath) {
   // bypass buildStepMessage so that value resolution happens in runStepLoop
   // (where contextStore contains values saved by preceding steps).
   if (step.action === 'saveExpression') {
+    if (checkedPaths && !checkedPaths[sourcePath]) return [];
     return [{ action: 'saveExpression', value: step.value, key: step.key, _taskPath: taskPath }];
   }
 
+  if (checkedPaths && !checkedPaths[sourcePath]) return [];
   var msg = buildStepMessage(step, pageElements, params);
   msg._taskPath = taskPath;
   return [msg];
@@ -560,7 +582,7 @@ function expandStep(step, tasksMap, pageElements, params, taskPath) {
  * @param {object} parentParams - Inherited params from an outer task context
  * @returns {Array} - Array of resolved step message objects
  */
-function expandTaskStep(step, tasksMap, pageElements, parentParams, parentPath) {
+function expandTaskStep(step, tasksMap, pageElements, parentParams, parentPath, checkedPaths, sourcePath) {
   parentPath = parentPath || [];
   var taskName = step.name;
   var taskDef = tasksMap[taskName];
@@ -608,7 +630,9 @@ function expandTaskStep(step, tasksMap, pageElements, parentParams, parentPath) 
 
   for (var i = 0; i < taskSteps.length; i++) {
     var childStep = taskSteps[i];
-    var expanded = expandStep(childStep, tasksMap, pageElements, mergedParams, childPath);
+    var childSourcePath = sourcePath + '.' + i;
+    if (checkedPaths && !hasSelectedPath(checkedPaths, childSourcePath)) continue;
+    var expanded = expandStep(childStep, tasksMap, pageElements, mergedParams, childPath, checkedPaths, childSourcePath);
     for (var j = 0; j < expanded.length; j++) {
       result.push(expanded[j]);
     }
@@ -1154,7 +1178,7 @@ function sendStepToRuntime(step, stepIndex) {
   var msg = {};
   var keys = Object.keys(step);
   for (var i = 0; i < keys.length; i++) {
-    if (keys[i] === '__needsCtxResolve' || keys[i] === '_condDepth' || keys[i] === '_taskPath') continue;
+    if (keys[i] === '__needsCtxResolve' || keys[i] === '_condDepth' || keys[i] === '_taskPath' || keys[i] === '_checkedPaths' || keys[i] === '_sourcePath') continue;
     msg[keys[i]] = step[keys[i]];
   }
   msg.type = 'EXECUTE_STEP';
@@ -1674,7 +1698,9 @@ function runStepLoop() {
         // nested one level deeper than the condition row.
         var ctxIfExpanded = [];
         for (var ci = 0; ci < step.then.length; ci++) {
-          var ctxExpanded = expandStep(step.then[ci], step._tasksMap || {}, step._pageElements || {}, step._params || {}, ctxTaskPath);
+          var ctxSourcePath = step._sourcePath + '.' + ci;
+          if (step._checkedPaths && !hasSelectedPath(step._checkedPaths, ctxSourcePath)) continue;
+          var ctxExpanded = expandStep(step.then[ci], step._tasksMap || {}, step._pageElements || {}, step._params || {}, ctxTaskPath, step._checkedPaths, ctxSourcePath);
           for (var cj = 0; cj < ctxExpanded.length; cj++) {
             var ctxChild = ctxExpanded[cj];
             ctxChild._condDepth = (ctxChild._condDepth || 0) + ctxBaseDepth + 1;

@@ -16,7 +16,7 @@ const { send } = useMessaging();
 
 const paramFormRef = ref<InstanceType<typeof ParamForm> | null>(null);
 const configSectionRef = ref<InstanceType<typeof ConfigSection> | null>(null);
-const checkedSteps = ref<number[]>([]);
+const checkedSteps = ref<Array<number | string>>([]);
 const paramValues = ref<Record<string, unknown>>({});
 const persistedConfig = ref<Partial<RunConfig> | undefined>(undefined);
 const dataSeeds = ref<Record<string, number | null>>({});
@@ -187,7 +187,7 @@ async function confirmDuplicate() {
   duplicateMessage.value = `Saved as "${label}" — find it under Automations → Your copies.`;
 }
 
-function onCheckedStepsUpdate(steps: number[]) {
+function onCheckedStepsUpdate(steps: Array<number | string>) {
   checkedSteps.value = steps;
 }
 

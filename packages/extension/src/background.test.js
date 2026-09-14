@@ -264,6 +264,28 @@ test('flattenSteps handles nested task expansion', function () {
   assert.equal(result[1].value, 'nested');
 });
 
+test('flattenSteps skips an unchecked third-level task leaf', function () {
+  var steps = [{ action: 'task', name: 'levelOne' }];
+  var tasks = {
+    levelOne: { steps: [{ action: 'task', name: 'levelTwo' }] },
+    levelTwo: { steps: [{ action: 'task', name: 'levelThree' }] },
+    levelThree: {
+      steps: [
+        { action: 'click', target: 'keep' },
+        { action: 'click', target: 'skip' }
+      ]
+    }
+  };
+  var pageElements = {
+    keep: { tag: 'button', where: { id: 'keep' } },
+    skip: { tag: 'button', where: { id: 'skip' } }
+  };
+
+  var result = bg.flattenSteps(steps, tasks, pageElements, ['0.0.0.0']);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].target, 'keep');
+});
+
 // ---------------------------------------------------------------------------
 // flattenSteps — childOf / parentDescriptor
 // ---------------------------------------------------------------------------

@@ -10,13 +10,14 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'update:checkedSteps', value: number[]): void;
+  (e: 'update:checkedSteps', value: Array<number | string>): void;
 }>();
 
 // --- Types ---
 
 interface ChecklistItem {
   stepIndex: number; // top-level step index (sent to background)
+  path: string;
   depth: number;
   isTask: boolean;
   isCondition?: boolean;
@@ -32,10 +33,11 @@ const flatItems = computed(() => {
   const items: ChecklistItem[] = [];
   const tasks = props.tasks || {};
 
-  function flattenSteps(stepsArr: Step[], parentIndex: number | null, depth: number) {
+  function flattenSteps(stepsArr: Step[], parentIndex: number | null, depth: number, parentPath: string) {
     for (let si = 0; si < stepsArr.length; si++) {
       const step = stepsArr[si];
       const topIndex = parentIndex !== null ? parentIndex : si;
+      const path = parentPath ? parentPath + '.' + si : String(si);
 
       if (step.action === 'task' && step.name && tasks[step.name]) {
         // Task header
@@ -45,6 +47,7 @@ const flatItems = computed(() => {
           : step.name.replace(/__/g, '.').replace(/\//g, ' > ');
         items.push({
           stepIndex: topIndex,
+          path,
           depth,
           isTask: true,
           step,
@@ -52,11 +55,12 @@ const flatItems = computed(() => {
         });
         // Recurse into child steps
         const childSteps = taskDef.steps || [];
-        flattenSteps(childSteps, topIndex, depth + 1);
+        flattenSteps(childSteps, topIndex, depth + 1, path);
       } else if (step.action === 'if' || step.action === 'condition' || step.action === 'ctxIf') {
         // Conditional header — show the condition, then nest its body
         items.push({
           stepIndex: topIndex,
+          path,
           depth,
           isTask: false,
           isCondition: true,
@@ -66,10 +70,11 @@ const flatItems = computed(() => {
         });
         // Recurse into the conditional body (nested under the condition)
         const thenSteps = step.then || [];
-        flattenSteps(thenSteps, topIndex, depth + 1);
+        flattenSteps(thenSteps, topIndex, depth + 1, path);
       } else {
         items.push({
           stepIndex: topIndex,
+          path,
           depth,
           isTask: false,
           step,
@@ -79,7 +84,7 @@ const flatItems = computed(() => {
     }
   }
 
-  flattenSteps(props.steps, null, 0);
+  flattenSteps(props.steps, null, 0, '');
   return items;
 });
 
@@ -95,17 +100,17 @@ watch(flatItems, (items) => {
 
 function emitCheckedSteps() {
   // Collect unique top-level step indices that are checked
-  const checked = new Set<number>();
+  const checked: Array<number | string> = [];
   for (let i = 0; i < flatItems.value.length; i++) {
     if (checkedState.value[i]) {
       const item = flatItems.value[i];
-      // Only include top-level items (depth 0, not child indices)
-      if (item.depth === 0) {
-        checked.add(item.stepIndex);
-      }
+      // Task and condition rows are grouping controls. Send only executable
+      // leaves so an unchecked nested leaf cannot be re-included by a checked
+      // ancestor row.
+      if (!item.isTask && !item.isCondition) checked.push(item.path);
     }
   }
-  emit('update:checkedSteps', Array.from(checked));
+  emit('update:checkedSteps', checked);
 }
 
 function onCheckboxChange(index: number) {

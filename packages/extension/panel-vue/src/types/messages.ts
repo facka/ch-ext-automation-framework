@@ -6,8 +6,8 @@ import type { FindTrace } from './findTrace';
 
 // Messages sent FROM panel TO background
 export type PanelMessage =
-  | { type: 'RUN_TEST'; testIndex: number; checkedSteps: number[]; config: RunConfig }
-  | { type: 'RUN_AUTOMATION'; automationIndex: number; params: Record<string, unknown>; checkedSteps: number[]; config: RunConfig }
+  | { type: 'RUN_TEST'; testIndex: number; checkedSteps: Array<number | string>; config: RunConfig }
+  | { type: 'RUN_AUTOMATION'; automationIndex: number; params: Record<string, unknown>; checkedSteps: Array<number | string>; config: RunConfig }
   | { type: 'RETRY_STEP'; stepIndex: number }
   | { type: 'SKIP_STEP'; stepIndex: number }
   | { type: 'STOP' }
