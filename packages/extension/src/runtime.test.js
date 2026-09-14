@@ -170,6 +170,53 @@ test('findElement: scopes search to parentNode', async function () {
   assert.equal(el.textContent, 'Inside');
 });
 
+test('findElementWithParent: interaction actions skip hidden matching elements', async function () {
+  setupDOM('<html><body>' +
+    '<button style="display:none" class="submit">Hidden</button>' +
+    '<button class="submit">Visible</button>' +
+    '</body></html>');
+  var findElementWithParent = window.eval('findElementWithParent');
+
+  var result = await findElementWithParent({
+    action: 'click',
+    target: 'submit',
+    elementDescriptor: { tag: 'button', where: { classIncludes: 'submit' } }
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.element.textContent, 'Visible');
+});
+
+test('findElementWithParent: assertExists can find a hidden matching element', async function () {
+  setupDOM('<html><body><button style="display:none" id="hidden">Hidden</button></body></html>');
+  var findElementWithParent = window.eval('findElementWithParent');
+
+  var result = await findElementWithParent({
+    action: 'assertExists',
+    target: 'hidden',
+    elementDescriptor: { tag: 'button', where: { id: 'hidden' } }
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.element.id, 'hidden');
+});
+
+test('findElement: XPath skips hidden matching elements when visibility is required', async function () {
+  setupDOM('<html><body>' +
+    '<button style="display:none">Hidden</button>' +
+    '<button>Visible</button>' +
+    '</body></html>');
+  var findElement = window.eval('findElement');
+
+  var el = await findElement(
+    { xpath: '//button' },
+    window.document,
+    { requireVisible: true }
+  );
+
+  assert.equal(el.textContent, 'Visible');
+});
+
 test('findElement: rejects after timeout if element not found', async function () {
   setupDOM('<html><body></body></html>');
 

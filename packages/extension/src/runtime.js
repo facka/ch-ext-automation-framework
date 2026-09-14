@@ -561,8 +561,13 @@ function traceClosestLabel(el, spec, parentNode) {
  * @param {Element|Document} [parentNode] - Optional parent node to scope the search
  * @returns {Promise<Element>} Resolves with the found element or rejects after timeout
  */
-function findElement(descriptor, parentNode) {
+function findElement(descriptor, parentNode, options) {
   var root = parentNode || document;
+  var requireVisible = options && options.requireVisible === true;
+
+  function isEligible(node) {
+    return !requireVisible || !detectHiddenAncestor(node);
+  }
 
   // XPath-based element lookup — bypass normal tag+where logic
   if (descriptor.xpath) {
@@ -574,13 +579,15 @@ function findElement(descriptor, parentNode) {
           descriptor.xpath,
           root,
           null,
-          XPathResult.FIRST_ORDERED_NODE_TYPE,
+          XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
           null
         );
-        var node = result.singleNodeValue;
-        if (node) {
-          resolve(node);
-          return;
+        for (var i = 0; i < result.snapshotLength; i++) {
+          var node = result.snapshotItem(i);
+          if (isEligible(node)) {
+            resolve(node);
+            return;
+          }
         }
         if (Date.now() - startTime >= TIMEOUT_5sec) {
           var elapsedMs = Date.now() - startTime;
@@ -637,7 +644,7 @@ function findElement(descriptor, parentNode) {
       // (isNthElement is a no-op in matchesWhere, so this counts the Filtered_List).
       var matchIndex = 0;
       for (var i = 0; i < candidates.length; i++) {
-        if (matchesWhere(candidates[i], where, root === document ? null : root)) {
+        if (matchesWhere(candidates[i], where, root === document ? null : root) && isEligible(candidates[i])) {
           matchIndex++;
           // Resolve the first passing candidate when no position is requested,
           // or the candidate whose running count equals the requested index.
@@ -774,6 +781,15 @@ function detectHiddenAncestor(el) {
   if (!el || el.nodeType !== 1) {
     return false;
   }
+  var documentRect = document.documentElement.getBoundingClientRect();
+  var hasLayoutMetrics = documentRect.width > 0 || documentRect.height > 0;
+  var elementStyle = window.getComputedStyle(el);
+  if (elementStyle.display === 'none' ||
+      elementStyle.visibility === 'hidden' ||
+      elementStyle.visibility === 'collapse' ||
+      parseFloat(elementStyle.opacity) === 0) {
+    return true;
+  }
   var node = el.parentElement;
   while (node && node.nodeType === 1) {
     var cs = window.getComputedStyle(node);
@@ -786,23 +802,20 @@ function detectHiddenAncestor(el) {
     if (parseFloat(cs.opacity) === 0) {
       return true;
     }
-    var r = node.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) {
-      return true;
-    }
-    // Clipping container: element rect entirely outside a hidden-overflow box.
-    if (cs.overflow === 'hidden' || cs.overflowX === 'hidden' || cs.overflowY === 'hidden') {
-      var er = el.getBoundingClientRect();
-      if (er.bottom <= r.top || er.top >= r.bottom || er.right <= r.left || er.left >= r.right) {
+    if (hasLayoutMetrics) {
+      var r = node.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) {
         return true;
+      }
+      // Clipping container: element rect entirely outside a hidden-overflow box.
+      if (cs.overflow === 'hidden' || cs.overflowX === 'hidden' || cs.overflowY === 'hidden') {
+        var er = el.getBoundingClientRect();
+        if (er.bottom <= r.top || er.top >= r.bottom || er.right <= r.left || er.left >= r.right) {
+          return true;
+        }
       }
     }
     node = node.parentElement;
-  }
-  // offsetParent === null (and not position:fixed) indicates the element is
-  // not rendered.
-  if (el.offsetParent === null && window.getComputedStyle(el).position !== 'fixed') {
-    return true;
   }
   return false;
 }
@@ -1019,6 +1032,9 @@ function findElementWithParent(stepMessage) {
   var parentDescriptor = stepMessage.parentDescriptor;
   var navigateSteps = elementDescriptor && elementDescriptor.navigate;
   var action = stepMessage.action;
+  var finderOptions = {
+    requireVisible: ['click', 'type', 'typePassword', 'select', 'pressKey', 'upload'].indexOf(action) !== -1
+  };
 
   // Synthesize a trace with an empty ordered step sequence (Req 1.7) for the
   // cases where no findElement trace was produced before failing (e.g. a
@@ -1042,7 +1058,7 @@ function findElementWithParent(stepMessage) {
   }
 
   if (!parentDescriptor && !(stepMessage.parentChain && stepMessage.parentChain.length >= 1)) {
-    return findElement(elementDescriptor, document)
+    return findElement(elementDescriptor, document, finderOptions)
       .then(function (element) {
         return applyNavigation(element);
       })
@@ -1168,7 +1184,7 @@ function findElementWithParent(stepMessage) {
     parentChain.forEach(function (ancestor) {
       chainPromise = chainPromise.then(function (state) {
         if (!state.ok) return state; // short-circuit on an earlier failure
-        return findElement(ancestor.descriptor, state.scope)
+        return findElement(ancestor.descriptor, state.scope, finderOptions)
           .then(function (anchor) {
             // Navigate-then-scope preserved per ancestor (Req 6.6).
             var navSteps = ancestor.descriptor && ancestor.descriptor.navigate;
@@ -1201,7 +1217,7 @@ function findElementWithParent(stepMessage) {
       if (!state.ok) return state;
 
       var finalScope = state.scope;
-      return findElement(elementDescriptor, finalScope)
+      return findElement(elementDescriptor, finalScope, finderOptions)
         .then(function (element) {
           return applyNavigation(element);
         })
@@ -1259,7 +1275,7 @@ function findElementWithParent(stepMessage) {
     ? parentDescriptor.where.id
     : 'unknown';
 
-  return findElement(parentDescriptor, document)
+  return findElement(parentDescriptor, document, finderOptions)
     .then(function (parentAnchor) {
       // Navigate-then-scope: parent descriptors may carry their own navigate
       // hops. When present, apply them to the parent anchor and scope the
@@ -1298,7 +1314,7 @@ function findElementWithParent(stepMessage) {
       // the parent key is unknown (Req: parent tomation-key for precise hover).
       tagElementKey(scopeElement, stepMessage.parentKey);
 
-      return findElement(elementDescriptor, scopeElement)
+      return findElement(elementDescriptor, scopeElement, finderOptions)
         .then(function (element) {
           return applyNavigation(element);
         })
