@@ -2742,6 +2742,26 @@ function parseFile(filePath) {
 }
 
 /**
+ * Remap generated AST locations back to the original TypeScript source lines.
+ * The TypeScript stripper removes type-only declarations, so generated lines
+ * cannot be used directly for user-facing diagnostics.
+ */
+function mapAstLocations(ast, lineMap) {
+  walk(ast, node => {
+    if (!node.loc) return;
+    const startLine = lineMap[node.loc.start.line];
+    const endLine = lineMap[node.loc.end.line];
+    if (startLine) node.loc.start.line = startLine;
+    if (endLine) node.loc.end.line = endLine;
+  });
+}
+
+function mapGeneratedLine(line, lineMap) {
+  if (!lineMap || !lineMap[line]) return line;
+  return lineMap[line];
+}
+
+/**
  * Parse DSL source code (already read/type-stripped) and return a structured AST representation.
  *
  * @param {string} source - JavaScript source code (types already stripped)
@@ -2775,12 +2795,18 @@ function parseSource(source, filePath, rawSource, options) {
     });
   } catch (e) {
     // acorn parse errors include a `loc` property with line info
-    const line = e.loc ? e.loc.line : 0;
+    const line = e.loc
+      ? mapGeneratedLine(e.loc.line, parseOptions.lineMap)
+      : 0;
     result.error = {
       message: 'Parse error in ' + filePath + ':' + line + ': ' + e.message,
       line,
     };
     return result;
+  }
+
+  if (parseOptions.lineMap) {
+    mapAstLocations(ast, parseOptions.lineMap);
   }
 
   // Extract import declarations: import X from './path' or import X from '~/path'

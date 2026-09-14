@@ -12,6 +12,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { parseFile, parseSource } = require('./parser.js');
+const { stripTypes } = require('./ts-stripper.js');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -73,6 +74,40 @@ test('parseFile: error message includes line number in expected format', () => {
   // Error message format: "Parse error in <file>:<line>: <detail>"
   assert.match(result.error.message, /Parse error in .+:\d+:/);
   assert.ok(result.error.message.includes(filePath));
+});
+
+test('parseSource: remaps TypeScript locations after type-only declarations are stripped', () => {
+  const source = [
+    "import { Test } from '@tomationjs/dsl';",
+    'interface User { name: string }',
+    '',
+    "Test('example', () => {",
+    '  unsupportedStatement();',
+    '});',
+  ].join('\n');
+  const stripped = stripTypes(source, '/tmp/example.test.ts');
+  const result = parseSource(stripped.code, '/tmp/example.test.ts', source, {
+    lineMap: stripped.lineMap,
+  });
+
+  assert.equal(result.warnings.length, 1);
+  assert.equal(result.warnings[0].line, 5);
+});
+
+test('parseSource: remaps syntax errors to original TypeScript lines', () => {
+  const source = [
+    "import { Test } from '@tomationjs/dsl';",
+    'type UserId = string;',
+    '',
+    'const broken = {{{;',
+  ].join('\n');
+  const stripped = stripTypes(source, '/tmp/example.pom.ts');
+  const result = parseSource(stripped.code, '/tmp/example.pom.ts', source, {
+    lineMap: stripped.lineMap,
+  });
+
+  assert.ok(result.error);
+  assert.equal(result.error.line, 4);
 });
 
 // ---------------------------------------------------------------------------

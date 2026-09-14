@@ -221,7 +221,10 @@ function runPipeline(cwd, options) {
 
     // Parse the (now plain JS) source
     log('    Parsing...');
-    var parsed = parseSource(source, filePath, rawSource, { baseUrl: resolveResult.baseUrl });
+    var parsed = parseSource(source, filePath, rawSource, {
+      baseUrl: resolveResult.baseUrl,
+      lineMap: isTypeScript ? stripResult.lineMap : null,
+    });
     if (parsed.error) {
       log('    ✗ Parse failed: ' + parsed.error.message);
       return { ok: false, error: parsed.error.message };
